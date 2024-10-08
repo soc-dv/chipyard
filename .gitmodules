@@ -154,3 +154,12 @@
 [submodule "generators/vexiiriscv"]
 	path = generators/vexiiriscv
 	url = https://github.com/ucb-bar/vexiiriscv-tile.git
+[submodule "tools/verif"]
+	path = tools/verif
+	url = https://github.com/TsaiAnson/verif.git
+[submodule "generators/sp21-dma"]
+	path = generators/sp21-dma
+	url = https://github.com/ucberkeley-ee290c/sp21-dma
+[submodule "tools/sp21-aes-rocc-accel"]
+	path = tools/sp21-aes-rocc-accel
+	url = https://github.com/ucberkeley-ee290c/sp21-aes-rocc-accel
