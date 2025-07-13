@@ -92,7 +92,8 @@ class ChipyardSubsystem(implicit p: Parameters) extends BaseSubsystem
   case (_, servTile: ServTile) =>
     val sbus = tlBusWrapperLocationMap(SBUS)
     sbus.coupleTo(s"serv_tile_${servTile.tileParams.tileId}") { bus: TLOutwardNode =>
-      servTile.tapNode := TLFragmenter(4, 4) := bus
+      //servTile.tapNode := TLFragmenter(4, 4) := bus
+      servTile.tapNode := TLWidthWidget(4) := TLFragmenter(4, 4) := bus
       println(s"[ChipyardSubsystem] tapNode connected for ServTile ${servTile.tileParams.tileId}")
     }
   case _ => // skip other tile types

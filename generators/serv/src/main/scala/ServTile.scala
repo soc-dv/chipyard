@@ -216,21 +216,16 @@ println(s"[ServTile] tapNode identity: ${tapNode}")
 val tapFork = TLXbar()
 tapFork := tapNode
 
-val slaveBase = 0x60000000L
-val slaveSize = 0x01000000L // 16MB
-val slaveAddrSet = AddressSet(slaveBase + servParams.tileId * slaveSize, log2Ceil(slaveSize))
-println(f"[ServTile] tileId=${servParams.tileId} gets address region: 0x${slaveAddrSet.base}%08X to 0x${slaveAddrSet.mask}%08X")
-
 // Define the actual TileLink manager node (serving memory region)
 val tlSlaveNode = TLManagerNode(Seq(
   TLSlavePortParameters.v1(
     managers = Seq(TLSlaveParameters.v1(
-      address            = Seq(AddressSet(slaveBase + servParams.tileId * slaveSize, log2Ceil(slaveSize))),
+      address            = Seq(AddressSet(0x60000000L, 0x0FFFFFFFL)),
       regionType         = RegionType.UNCACHED,
       executable         = true,
-      supportsGet        = TransferSizes(1, 64),
-      supportsPutFull    = TransferSizes(1, 64),
-      supportsPutPartial = TransferSizes(1, 64),
+      supportsGet        = TransferSizes(1, 4),
+      supportsPutFull    = TransferSizes(1, 4),
+      supportsPutPartial = TransferSizes(1, 4),
       fifoId             = Some(0)
     )),
     beatBytes = 4
@@ -242,13 +237,11 @@ tlSlaveNode := tapFork
 
 // Expose the actual slaveNode implementation
 override def slaveNode: TLInwardNode = tlSlaveNode
-val axiBaseAddress = 0x50000000L
-val axiPerTileSize = 0x04000000L // 64MB per tile AXI region
-//val axiTileAddrSet = AddressSet(axiBaseAddress + servParams.tileId * axiPerTileSize, axiPerTileSize - 1)
+
 // Also expose an AXI4 version (optional)
 val axi4SlaveNode = AXI4SlaveNode(Seq(AXI4SlavePortParameters(
   slaves = Seq(AXI4SlaveParameters(
-    address         = Seq(AddressSet(axiBaseAddress + servParams.tileId * axiPerTileSize, axiPerTileSize - 1)),
+    address         = Seq(AddressSet(0x54000000L, 0x03FFFFFFL)),
     regionType      = RegionType.UNCACHED,
     executable      = true,
     supportsRead    = TransferSizes(1, 4),
@@ -269,26 +262,6 @@ axi4SlaveNode :=
   println("ServTile: tlSlaveNode connected from tapFork")
 
 //------------ SLAVE NODE ENDS --------------//
-
-
-
-
-val tlWidthWidget = LazyModule(new TLWidthWidget(4))        // make width = 4 bytes
-//val tl2axi = LazyModule(new TLToAXI4())
-val axi4Fragmenter  = LazyModule(new AXI4Fragmenter())
-val axi4IdIndexer   = LazyModule(new AXI4IdIndexer(1))
-val axi4UserYanker  = LazyModule(new AXI4UserYanker(Some(1)))
-val axi4Buffer      = LazyModule(new AXI4Buffer())
-val tlShrinker      = LazyModule(new TLSourceShrinker(1))
-
-val tl2axi = LazyModule(new TLToAXI4(
-  combinational = true,           // or false if you want buffering
-  adapterName = Some("serv_tl2axi"),
-  stripBits = 0,
-  wcorrupt = true
-))
-
-
 
 
 
