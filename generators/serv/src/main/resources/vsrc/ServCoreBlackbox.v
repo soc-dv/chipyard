@@ -13,135 +13,135 @@ module ServCoreBlackbox
 
 (
     // CORE TOP
-    input   clk,
-    input   rst,
-    input   i_timer_irq,
+    input   wire clk,
+    input   wire rst,
+    input   wire i_timer_irq,
 
     // AXI2WB -- AXI SIGNALS FROM EXTERNAL(BUS/PERIPHERAL/ADAPTER) TO BRIDGE
 
     // AXI address write channel
-    input   [AW_B-1:0] i_awaddr,
-    input   i_awvalid,
-    output  o_awready,
+    input   wire [AW_B-1:0] i_awaddr,
+    input   wire i_awvalid,
+    output  wire o_awready,
      //unused signals
-    input  [ID_WIDTH-1:0] i_aw_id,
-    input  [7:0] i_aw_len,
-    input  [3:0] i_aw_size,
-    input  [1:0] i_aw_burst,
-    input  i_aw_lock,
-    input  [3:0] i_aw_cache,
-    input  [2:0] i_aw_prot,
-    input  [3:0] i_aw_qos,
-    input  [3:0] i_aw_region,
-    input  [5:0] i_aw_atop,
-    input  [USER_WIDTH-1:0] i_aw_user,
+    input  wire [ID_WIDTH:0] i_aw_id,
+    input  wire [7:0] i_aw_len,
+    input  wire [2:0] i_aw_size,
+    input  wire [1:0] i_aw_burst,
+    input  wire i_aw_lock,
+    input  wire [3:0] i_aw_cache,
+    input  wire [2:0] i_aw_prot,
+    input  wire [3:0] i_aw_qos,
+    input  wire [3:0] i_aw_region,
+    input  wire [5:0] i_aw_atop,
+    input  wire [USER_WIDTH:0] i_aw_user,
 
     // AXI address read channel 
-    input   [AW_B-1:0] i_araddr,
-    input   i_arvalid,
-    output  o_arready,
+    input   wire [AW_B-1:0] i_araddr,
+    input   wire i_arvalid,
+    output  wire o_arready,
     //unused signals
-    input [ID_WIDTH-1:0] i_ar_id,
-    input  [7:0] i_ar_len,
-    input  [2:0] i_ar_size,
-    input  [1:0] i_ar_burst,
-    input  i_ar_lock,
-    input  [3:0]i_ar_cache,
-    input  [2:0]i_ar_prot,
-    input  [3:0]i_ar_qos,
-    input  [3:0]i_ar_region,
-    input  [USER_WIDTH-1:0] i_ar_user,
+    input wire [ID_WIDTH:0] i_ar_id,
+    input  wire [7:0] i_ar_len,
+    input  wire [2:0] i_ar_size,
+    input  wire [1:0] i_ar_burst,
+    input  wire i_ar_lock,
+    input  wire [3:0]i_ar_cache,
+    input  wire [2:0]i_ar_prot,
+    input  wire [3:0]i_ar_qos,
+    input  wire [3:0]i_ar_region,
+    input  wire [USER_WIDTH:0] i_ar_user,
    
     // AXI write channel
-    input   [31:0] i_wdata,
-    input   [3:0] i_wstrb,
-    input   i_wvalid,
-    output  o_wready,
+    input   wire [31:0] i_wdata,
+    input   wire [3:0] i_wstrb,
+    input   wire i_wvalid,
+    output  wire o_wready,
    //unused signals
-    input   i_w_last,
-    input  [USER_WIDTH-1:0] i_w_user,
+    input   wire i_w_last,
+    input  wire [USER_WIDTH:0] i_w_user,
 
     // AXI response channel
-    input   i_bready,
-    output  [1:0] o_bresp,
-    output  o_bvalid,
+    input   wire i_bready,
+    output  wire [1:0] o_bresp,
+    output  wire o_bvalid,
    //unused signals 
-   output  [ID_WIDTH-1:0] o_b_id,
-   output  [USER_WIDTH-1:0] o_b_user,
+   output  wire [ID_WIDTH:0] o_b_id,
+   output  wire [USER_WIDTH:0] o_b_user,
     
     // AXI read channel
-    input   i_rready,
-    output  [31:0] o_rdata,
-    output  [1:0] o_rresp,
-    output  o_rlast,
-    output  o_rvalid,
+    input   wire i_rready,
+    output  wire [31:0] o_rdata,
+    output  wire [1:0] o_rresp,
+    output  wire o_rlast,
+    output  wire o_rvalid,
     //unused signals
-    output  [ID_WIDTH-1:0] o_r_id,
-    output  [USER_WIDTH-1:0] o_r_user,
+    output  wire [ID_WIDTH:0] o_r_id,
+    output  wire [USER_WIDTH:0] o_r_user,
     // ---------------------------------------------------------------- //
 
     // WB2AXI AXI SIGNALS FROM BRIDGE TO EXTERNAL(PERIPHERAL/ADAPTER/BUS)
 
 
     // AXI address write channel
-    input   i_awmready,
-    output  [AW_B-1:0] o_awmaddr,
-    output  o_awmvalid,
+    input   wire i_awmready,
+    output  wire [AW_B-1:0] o_awmaddr,
+    output  wire o_awmvalid,
     //unused signals
-    output  [ID_WIDTH-1:0] o_awm_id,
-    output  [7:0] o_awm_len,
-    output  [2:0] o_awm_size,
-    output  [1:0] o_awm_burst,
-    output  o_awm_lock,
-    output  [3:0] o_awm_cache,
-    output  [2:0] o_awm_prot,
-    output  [3:0] o_awm_qos,
-    output  [3:0] o_awm_region,
-    output  [5:0] o_awm_atop,
-    output  [USER_WIDTH-1:0] o_awm_user,
+    output  wire [ID_WIDTH:0] o_awm_id,
+    output  wire [7:0] o_awm_len,
+    output  wire [2:0] o_awm_size,
+    output  wire [1:0] o_awm_burst,
+    output  wire o_awm_lock,
+    output  wire [3:0] o_awm_cache,
+    output  wire [2:0] o_awm_prot,
+    output  wire [3:0] o_awm_qos,
+    output  wire [3:0] o_awm_region,
+    output  wire [5:0] o_awm_atop,
+    output  wire [USER_WIDTH-1:0] o_awm_user,
 
     // AXI address read channel
-    input   i_armready,
-    output  [AW_B-1:0] o_armaddr,
-    output  o_armvalid,
+    input   wire i_armready,
+    output  wire [AW_B-1:0] o_armaddr,
+    output  wire o_armvalid,
     //unused signals
-    output  [ID_WIDTH-1:0] o_arm_id,
-    output  [7:0] o_arm_len,
-    output  [2:0] o_arm_size,
-    output  [1:0] o_arm_burst,
-    output  o_arm_lock,
-    output  [3:0] o_arm_cache,
-    output  [2:0] o_arm_prot,
-    output  [3:0] o_arm_qos,
-    output  [3:0] o_arm_region,
-    output  [USER_WIDTH-1:0] o_arm_user,
+    output  wire [ID_WIDTH:0] o_arm_id,
+    output  wire [7:0] o_arm_len,
+    output  wire [2:0] o_arm_size,
+    output  wire [1:0] o_arm_burst,
+    output  wire o_arm_lock,
+    output  wire [3:0] o_arm_cache,
+    output  wire [2:0] o_arm_prot,
+    output  wire [3:0] o_arm_qos,
+    output  wire [3:0] o_arm_region,
+    output  wire [USER_WIDTH:0] o_arm_user,
 
     // AXI write channel
-    input  i_wmready,
-    output [31:0] o_wmdata,
-    output [3:0] o_wmstrb,
-    output o_wmvalid,
+    input  wire i_wmready,
+    output wire [31:0] o_wmdata,
+    output wire [3:0] o_wmstrb,
+    output wire o_wmvalid,
     //unused signals
-    output  o_wm_last,
-    output  [USER_WIDTH-1:0] o_wm_user,
+    output  wire o_wm_last,
+    output  wire [USER_WIDTH:0] o_wm_user,
 
     // AXI response channel
-    input  [1:0] i_bmresp,
-    input  i_bmvalid,
-    output o_bmready,
+    input  wire [1:0] i_bmresp,
+    input  wire i_bmvalid,
+    output wire o_bmready,
     //unused signals 
-    input  [ID_WIDTH-1:0] i_bm_id,
-    input  [USER_WIDTH-1:0] i_bm_user,
+    input  wire [ID_WIDTH:0] i_bm_id,
+    input  wire [USER_WIDTH:0] i_bm_user,
     
     //AXI read channel
-    input   [31:0] i_rmdata,
-    input   [1:0] i_rmresp,
-    input   i_rmlast,
-    input   i_rmvalid,
-    output  o_rmready,
+    input   wire [31:0] i_rmdata,
+    input   wire [1:0] i_rmresp,
+    input   wire i_rmlast,
+    input   wire i_rmvalid,
+    output  wire o_rmready,
     //unused signals
-    input wire [ID_WIDTH-1:0] i_rm_id,
-    input wire [USER_WIDTH-1:0] i_rm_user
+    input wire [ID_WIDTH:0] i_rm_id,
+    input wire [USER_WIDTH:0] i_rm_user
 
 );
 

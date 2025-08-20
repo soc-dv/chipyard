@@ -13,32 +13,30 @@ PREPROC_VERILOG = ServCoreBlackbox.preprocessed.v
 default: $(PREPROC_VERILOG)
 
 # SERV RTL source files
-SERV_VSRCS = \
-        $(serv_dir)/rtl/serv_alu.v \
-	$(serv_dir)/rtl/serv_bufreg.v \
-	$(serv_dir)/rtl/serv_bufreg2.v \
-	$(serv_dir)/rtl/serv_ctrl.v \
-	$(serv_dir)/rtl/serv_decode.v \
-	$(serv_dir)/rtl/serv_immdec.v \
-	$(serv_dir)/rtl/serv_mem_if.v \
-	$(serv_dir)/rtl/serv_rf_if.v \
-	$(serv_dir)/rtl/serv_state.v \
-	$(serv_dir)/rtl/serv_top.v \
-	$(serv_dir)/rtl/serv_rf_ram_if.v \
-	$(serv_dir)/rtl/serving_ram.v \
-	$(serv_dir)/rtl/serving.v \
-	$(serv_dir)/rtl/servile_rf_mem_if.v \
-	$(serv_dir)/rtl/servile.v \
-	$(serv_dir)/rtl/servile_arbiter.v \
-	$(serv_dir)/rtl/servile_mux.v \
-	$(serv_dir)/rtl/ServCore.v \
-	$(serv_dir)/rtl/complete_bridge.v \
-	$(serv_dir)/rtl/serv_aligner.v \
-	$(serv_dir)/rtl/serv_compdec.v \
-	$(serv_dir)/rtl/serv_csr.v \
-	$(serv_dir)/rtl/serv_debug.v \
-	$(serv_dir)/rtl/serv_synth_wrapper.v \
-	$(serv_dir)/rtl/serv_rf_top.v
+SERV_VSRCS =\
+$(serv_dir)/rtl/serv_debug.v\
+$(serv_dir)/rtl/serv_compdec.v\
+$(serv_dir)/rtl/serv_aligner.v\
+$(serv_dir)/rtl/serv_csr.v\
+$(serv_dir)/rtl/serv_mem_if.v\
+$(serv_dir)/rtl/serv_rf_if.v\
+$(serv_dir)/rtl/serv_alu.v\
+$(serv_dir)/rtl/serv_ctrl.v\
+$(serv_dir)/rtl/serv_bufreg2.v\
+$(serv_dir)/rtl/serv_bufreg.v\
+$(serv_dir)/rtl/serv_immdec.v\
+$(serv_dir)/rtl/serv_decode.v\
+$(serv_dir)/rtl/serv_state.v\
+$(serv_dir)/rtl/serv_top.v\
+$(serv_dir)/rtl/serv_rf_ram_if.v\
+$(serv_dir)/rtl/servile_arbiter.v\
+$(serv_dir)/rtl/servile_mux.v\
+$(serv_dir)/rtl/servile.v\
+$(serv_dir)/rtl/servile_rf_mem_if.v\
+$(serv_dir)/rtl/serving_ram.v\
+$(serv_dir)/rtl/serving.v\
+$(serv_dir)/rtl/complete_bridge.v\
+$(serv_dir)/rtl/ServCore.v
  
 # Top-level wrapper file (matches Chisel blackbox declaration)
 SERV_WRAPPER = $(vsrc_dir)/ServCoreBlackbox.v

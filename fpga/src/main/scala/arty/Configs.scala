@@ -34,4 +34,10 @@ class TinyRocketArtyConfig extends Config(
   new freechips.rocketchip.rocket.WithNBreakpoints(2) ++
   new chipyard.TinyRocketConfig
 )
+
+class ServArtyConfig extends Config(
+  new WithArtyTweaks ++
+  new freechips.rocketchip.rocket.WithNBreakpoints(0) ++
+  new chipyard.ServArtyConfig
+)
 // DOC include end: AbstractArty and Rocket

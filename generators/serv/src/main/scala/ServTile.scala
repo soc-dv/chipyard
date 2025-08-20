@@ -82,14 +82,14 @@ case class ServCoreParams(
   val mcontextWidth = 0              // No machine context
   val scontextWidth = 0              // No supervisor context
   // SERV SPECIFIC
-  val aw_b: Int = 32
-  val iw_b: Int = 0
-  val uw_b: Int = 0
-  val with_csr_b: Boolean = true
-  val memsize: Int = 8192
-  val sim_b: Int = 1
-  val memfile_b: String = ""
-  val reset_strategy: String = "MINI"
+  val AW_B: Int = 32
+  val ID_WIDTH: Int = 0
+  val USER_WIDTH: Int = 0
+  val WITH_CSR_B: Boolean = true
+  val MEMSIZE_B: Int = 8192
+  val SIM_B: Int = 1
+  val MEMFILE_B: String = ""
+  val RESET_STRATEGY_B: String = "MINI"
 }
 
 
@@ -275,15 +275,16 @@ class ServTileModuleImp(outer: ServTile) extends BaseTileModuleImp(outer){
   
 
   val core = Module(new ServCoreBlackbox(
-  memfile_b        = outer.servParams.core.memfile_b,
-  memsize_b        = outer.servParams.core.memsize,
-  sim_b            = outer.servParams.core.sim_b ,
-  reset_strategy_b = outer.servParams.core.reset_strategy,
-  with_csr_b       = if(outer.servParams.core.with_csr_b) 1 else 0,
-  aw_b             = outer.servParams.core.aw_b,
-  uw_b             = outer.servParams.core.uw_b,
-  iw_b             = outer.servParams.core.iw_b
+  MEMFILE_B        = outer.servParams.core.MEMFILE_B,
+  MEMSIZE_B        = outer.servParams.core.MEMSIZE_B,
+  SIM_B            = outer.servParams.core.SIM_B,
+  RESET_STRATEGY_B = outer.servParams.core.RESET_STRATEGY_B,
+  WITH_CSR_B       = if(outer.servParams.core.WITH_CSR_B) 1 else 0,
+  AW_B             = outer.servParams.core.AW_B,
+  USER_WIDTH       = outer.servParams.core.USER_WIDTH,
+  ID_WIDTH         = outer.servParams.core.ID_WIDTH
 ))
+
 
 
   core.io.clk := clock

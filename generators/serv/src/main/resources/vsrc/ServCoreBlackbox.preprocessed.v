@@ -1,4 +1,1012 @@
 `define VERILATOR
+module serv_debug
+  #(parameter W = 1,
+    parameter RESET_PC = 0,
+    //Internally calculated. Do not touch
+    parameter B=W-1)
+   (
+`ifdef RISCV_FORMAL
+    output reg	      rvfi_valid = 1'b0,
+    output reg [63:0]  rvfi_order = 64'd0,
+    output reg [31:0]  rvfi_insn = 32'd0,
+    output reg	      rvfi_trap = 1'b0,
+    output reg	      rvfi_halt = 1'b0,  // Not used
+    output reg	      rvfi_intr = 1'b0,  // Not used
+    output reg [1:0]   rvfi_mode = 2'b11, // Not used
+    output reg [1:0]   rvfi_ixl = 2'b01,  // Not used
+    output reg [4:0]   rvfi_rs1_addr,
+    output reg [4:0]   rvfi_rs2_addr,
+    output reg [31:0]  rvfi_rs1_rdata,
+    output reg [31:0]  rvfi_rs2_rdata,
+    output reg [4:0]   rvfi_rd_addr,
+    output wire [31:0] rvfi_rd_wdata,
+    output reg [31:0]  rvfi_pc_rdata,
+    output wire [31:0]  rvfi_pc_wdata,
+    output reg [31:0]  rvfi_mem_addr,
+    output reg [3:0]   rvfi_mem_rmask,
+    output reg [3:0]   rvfi_mem_wmask,
+    output reg [31:0]  rvfi_mem_rdata,
+    output reg [31:0]  rvfi_mem_wdata,
+    input wire [31:0]  i_dbus_adr,
+    input wire [31:0]  i_dbus_dat,
+    input wire [3:0]   i_dbus_sel,
+    input wire	      i_dbus_we,
+    input wire [31:0]  i_dbus_rdt,
+    input wire	      i_dbus_ack,
+    input wire	      i_ctrl_pc_en,
+    input wire	[B:0]      rs1,
+    input wire [B:0]	      rs2,
+    input wire [4:0]   rs1_addr,
+    input wire [4:0]   rs2_addr,
+    input wire [3:0]   immdec_en,
+    input wire	      rd_en,
+    input wire	      trap,
+    input wire	      i_rf_ready,
+    input wire	      i_ibus_cyc,
+    input wire	      two_stage_op,
+    input wire	      init,
+    input wire [31:0]  i_ibus_adr,
+`endif
+    input wire	      i_clk,
+    input wire	      i_rst,
+    input wire [31:0] i_ibus_rdt,
+    input wire	      i_ibus_ack,
+    input wire [4:0]  i_rd_addr,
+    input wire	      i_cnt_en,
+    input wire [B:0]  i_csr_in,
+    input wire	      i_csr_mstatus_en,
+    input wire	      i_csr_mie_en,
+    input wire	      i_csr_mcause_en,
+    input wire	      i_csr_en,
+    input wire [1:0]  i_csr_addr,
+    input wire	      i_wen0,
+    input wire [B:0]  i_wdata0,
+    input wire	      i_cnt_done);
+
+   reg		      update_rd = 1'b0;
+   reg		      update_mscratch;
+   reg		      update_mtvec;
+   reg		      update_mepc;
+   reg		      update_mtval;
+   reg		      update_mstatus;
+   reg		      update_mie;
+   reg		      update_mcause;
+
+   reg [31:0]	      dbg_rd = 32'hxxxxxxxx;
+   reg [31:0]	      dbg_csr = 32'hxxxxxxxx;
+   reg [31:0]	      dbg_mstatus  = 32'hxxxxxxxx;
+   reg [31:0]	      dbg_mie      = 32'hxxxxxxxx;
+   reg [31:0]	      dbg_mcause   = 32'hxxxxxxxx;
+   reg [31:0]	      dbg_mscratch = 32'hxxxxxxxx;
+   reg [31:0]	      dbg_mtvec    = 32'hxxxxxxxx;
+   reg [31:0]	      dbg_mepc     = 32'hxxxxxxxx;
+   reg [31:0]	      dbg_mtval    = 32'hxxxxxxxx;
+   reg [31:0]	      x1  = 32'hxxxxxxxx;
+   reg [31:0]	      x2  = 32'hxxxxxxxx;
+   reg [31:0]	      x3  = 32'hxxxxxxxx;
+   reg [31:0]	      x4  = 32'hxxxxxxxx;
+   reg [31:0]	      x5  = 32'hxxxxxxxx;
+   reg [31:0]	      x6  = 32'hxxxxxxxx;
+   reg [31:0]	      x7  = 32'hxxxxxxxx;
+   reg [31:0]	      x8  = 32'hxxxxxxxx;
+   reg [31:0]	      x9  = 32'hxxxxxxxx;
+   reg [31:0]	      x10 = 32'hxxxxxxxx;
+   reg [31:0]	      x11 = 32'hxxxxxxxx;
+   reg [31:0]	      x12 = 32'hxxxxxxxx;
+   reg [31:0]	      x13 = 32'hxxxxxxxx;
+   reg [31:0]	      x14 = 32'hxxxxxxxx;
+   reg [31:0]	      x15 = 32'hxxxxxxxx;
+   reg [31:0]	      x16 = 32'hxxxxxxxx;
+   reg [31:0]	      x17 = 32'hxxxxxxxx;
+   reg [31:0]	      x18 = 32'hxxxxxxxx;
+   reg [31:0]	      x19 = 32'hxxxxxxxx;
+   reg [31:0]	      x20 = 32'hxxxxxxxx;
+   reg [31:0]	      x21 = 32'hxxxxxxxx;
+   reg [31:0]	      x22 = 32'hxxxxxxxx;
+   reg [31:0]	      x23 = 32'hxxxxxxxx;
+   reg [31:0]	      x24 = 32'hxxxxxxxx;
+   reg [31:0]	      x25 = 32'hxxxxxxxx;
+   reg [31:0]	      x26 = 32'hxxxxxxxx;
+   reg [31:0]	      x27 = 32'hxxxxxxxx;
+   reg [31:0]	      x28 = 32'hxxxxxxxx;
+   reg [31:0]	      x29 = 32'hxxxxxxxx;
+   reg [31:0]	      x30 = 32'hxxxxxxxx;
+   reg [31:0]	      x31 = 32'hxxxxxxxx;
+
+   always @(posedge i_clk) begin
+      update_rd <= i_cnt_done & i_wen0;
+
+      if (i_wen0)
+        dbg_rd <= {i_wdata0,dbg_rd[31:W]};
+
+      //End of instruction that writes to RF
+      if (update_rd) begin
+	 case (i_rd_addr)
+	   5'd1  : x1  <= dbg_rd;
+	   5'd2  : x2  <= dbg_rd;
+	   5'd3  : x3  <= dbg_rd;
+	   5'd4  : x4  <= dbg_rd;
+	   5'd5  : x5  <= dbg_rd;
+	   5'd6  : x6  <= dbg_rd;
+	   5'd7  : x7  <= dbg_rd;
+	   5'd8  : x8  <= dbg_rd;
+	   5'd9  : x9  <= dbg_rd;
+	   5'd10 : x10 <= dbg_rd;
+	   5'd11 : x11 <= dbg_rd;
+	   5'd12 : x12 <= dbg_rd;
+	   5'd13 : x13 <= dbg_rd;
+	   5'd14 : x14 <= dbg_rd;
+	   5'd15 : x15 <= dbg_rd;
+	   5'd16 : x16 <= dbg_rd;
+	   5'd17 : x17 <= dbg_rd;
+	   5'd18 : x18 <= dbg_rd;
+	   5'd19 : x19 <= dbg_rd;
+	   5'd20 : x20 <= dbg_rd;
+	   5'd21 : x21 <= dbg_rd;
+	   5'd22 : x22 <= dbg_rd;
+	   5'd23 : x23 <= dbg_rd;
+	   5'd24 : x24 <= dbg_rd;
+	   5'd25 : x25 <= dbg_rd;
+	   5'd26 : x26 <= dbg_rd;
+	   5'd27 : x27 <= dbg_rd;
+	   5'd28 : x28 <= dbg_rd;
+	   5'd29 : x29 <= dbg_rd;
+	   5'd30 : x30 <= dbg_rd;
+	   5'd31 : x31 <= dbg_rd;
+	   default : ;
+	 endcase
+      end
+
+      update_mscratch <= i_cnt_done & i_csr_en & (i_csr_addr == 2'b00);
+      update_mtvec    <= i_cnt_done & i_csr_en & (i_csr_addr == 2'b01);
+      update_mepc     <= i_cnt_done & i_csr_en & (i_csr_addr == 2'b10);
+      update_mtval    <= i_cnt_done & i_csr_en & (i_csr_addr == 2'b11);
+      update_mstatus  <= i_cnt_done & i_csr_mstatus_en;
+      update_mie      <= i_cnt_done & i_csr_mie_en;
+      update_mcause   <= i_cnt_done & i_csr_mcause_en;
+
+      if (i_cnt_en)
+	dbg_csr <= {i_csr_in, dbg_csr[31:W]};
+
+      if (update_mscratch) dbg_mscratch <= dbg_csr;
+      if (update_mtvec)    dbg_mtvec    <= dbg_csr;
+      if (update_mepc )    dbg_mepc     <= dbg_csr;
+      if (update_mtval)    dbg_mtval    <= dbg_csr;
+      if (update_mstatus)  dbg_mstatus  <= dbg_csr;
+      if (update_mie)      dbg_mie      <= dbg_csr;
+      if (update_mcause)   dbg_mcause   <= dbg_csr;
+   end
+
+   reg LUI, AUIPC, JAL, JALR, BEQ, BNE, BLT, BGE, BLTU, BGEU, LB, LH, LW, LBU, LHU, SB, SH, SW, ADDI, SLTI, SLTIU, XORI, ORI, ANDI,SLLI, SRLI, SRAI, ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND, FENCE, ECALL, EBREAK;
+   reg CSRRW, CSRRS, CSRRC, CSRRWI, CSRRSI, CSRRCI;
+   reg OTHER;
+
+   always @(posedge i_clk) begin
+      if (i_ibus_ack) begin
+	 LUI    <= 1'b0;
+	 AUIPC  <= 1'b0;
+	 JAL    <= 1'b0;
+	 JALR   <= 1'b0;
+	 BEQ    <= 1'b0;
+	 BNE    <= 1'b0;
+	 BLT    <= 1'b0;
+	 BGE    <= 1'b0;
+	 BLTU   <= 1'b0;
+	 BGEU   <= 1'b0;
+	 LB     <= 1'b0;
+	 LH     <= 1'b0;
+	 LW     <= 1'b0;
+	 LBU    <= 1'b0;
+	 LHU    <= 1'b0;
+	 SB     <= 1'b0;
+	 SH     <= 1'b0;
+	 SW     <= 1'b0;
+	 ADDI   <= 1'b0;
+	 SLTI   <= 1'b0;
+	 SLTIU  <= 1'b0;
+	 XORI   <= 1'b0;
+	 ORI    <= 1'b0;
+	 ANDI   <= 1'b0;
+	 SLLI   <= 1'b0;
+	 SRLI   <= 1'b0;
+	 SRAI   <= 1'b0;
+	 ADD    <= 1'b0;
+	 SUB    <= 1'b0;
+	 SLL    <= 1'b0;
+	 SLT    <= 1'b0;
+	 SLTU   <= 1'b0;
+	 XOR    <= 1'b0;
+	 SRL    <= 1'b0;
+	 SRA    <= 1'b0;
+	 OR     <= 1'b0;
+	 AND    <= 1'b0;
+	 FENCE  <= 1'b0;
+	 ECALL  <= 1'b0;
+	 EBREAK <= 1'b0;
+	 CSRRW  <= 1'b0;
+	 CSRRS  <= 1'b0;
+	 CSRRC  <= 1'b0;
+	 CSRRWI <= 1'b0;
+	 CSRRSI <= 1'b0;
+	 CSRRCI <= 1'b0;
+	 OTHER  <= 1'b0;
+
+	 casez(i_ibus_rdt)
+	   //  3322222_22222 11111_111 11
+	   //  1098765_43210 98765_432 10987_65432_10
+	   32'b???????_?????_?????_???_?????_01101_11 : LUI    <= 1'b1;
+	   32'b???????_?????_?????_???_?????_00101_11 : AUIPC  <= 1'b1;
+	   32'b???????_?????_?????_???_?????_11011_11 : JAL    <= 1'b1;
+	   32'b???????_?????_?????_000_?????_11001_11 : JALR   <= 1'b1;
+	   32'b???????_?????_?????_000_?????_11000_11 : BEQ    <= 1'b1;
+	   32'b???????_?????_?????_001_?????_11000_11 : BNE    <= 1'b1;
+	   32'b???????_?????_?????_100_?????_11000_11 : BLT    <= 1'b1;
+	   32'b???????_?????_?????_101_?????_11000_11 : BGE    <= 1'b1;
+	   32'b???????_?????_?????_110_?????_11000_11 : BLTU   <= 1'b1;
+	   32'b???????_?????_?????_111_?????_11000_11 : BGEU   <= 1'b1;
+	   32'b???????_?????_?????_000_?????_00000_11 : LB     <= 1'b1;
+	   32'b???????_?????_?????_001_?????_00000_11 : LH     <= 1'b1;
+	   32'b???????_?????_?????_010_?????_00000_11 : LW     <= 1'b1;
+	   32'b???????_?????_?????_100_?????_00000_11 : LBU    <= 1'b1;
+	   32'b???????_?????_?????_101_?????_00000_11 : LHU    <= 1'b1;
+	   32'b???????_?????_?????_000_?????_01000_11 : SB     <= 1'b1;
+	   32'b???????_?????_?????_001_?????_01000_11 : SH     <= 1'b1;
+	   32'b???????_?????_?????_010_?????_01000_11 : SW     <= 1'b1;
+	   32'b???????_?????_?????_000_?????_00100_11 : ADDI   <= 1'b1;
+	   32'b???????_?????_?????_010_?????_00100_11 : SLTI   <= 1'b1;
+	   32'b???????_?????_?????_011_?????_00100_11 : SLTIU  <= 1'b1;
+	   32'b???????_?????_?????_100_?????_00100_11 : XORI   <= 1'b1;
+	   32'b???????_?????_?????_110_?????_00100_11 : ORI    <= 1'b1;
+	   32'b???????_?????_?????_111_?????_00100_11 : ANDI   <= 1'b1;
+	   32'b0000000_?????_?????_001_?????_00100_11 : SLLI   <= 1'b1;
+	   32'b0000000_?????_?????_101_?????_00100_11 : SRLI   <= 1'b1;
+	   32'b0100000_?????_?????_101_?????_00100_11 : SRAI   <= 1'b1;
+	   32'b0000000_?????_?????_000_?????_01100_11 : ADD    <= 1'b1;
+	   32'b0100000_?????_?????_000_?????_01100_11 : SUB    <= 1'b1;
+	   32'b0000000_?????_?????_001_?????_01100_11 : SLL    <= 1'b1;
+	   32'b0000000_?????_?????_010_?????_01100_11 : SLT    <= 1'b1;
+	   32'b0000000_?????_?????_011_?????_01100_11 : SLTU   <= 1'b1;
+	   32'b???????_?????_?????_100_?????_01100_11 : XOR    <= 1'b1;
+	   32'b0000000_?????_?????_101_?????_01100_11 : SRL    <= 1'b1;
+	   32'b0100000_?????_?????_101_?????_01100_11 : SRA    <= 1'b1;
+	   32'b???????_?????_?????_110_?????_01100_11 : OR     <= 1'b1;
+	   32'b???????_?????_?????_111_?????_01100_11 : AND    <= 1'b1;
+	   32'b???????_?????_?????_000_?????_00011_11 : FENCE  <= 1'b1;
+	   32'b0000000_00000_00000_000_00000_11100_11 : ECALL  <= 1'b1;
+	   32'b0000000_00001_00000_000_00000_11100_11 : EBREAK <= 1'b1;
+	   32'b???????_?????_?????_001_?????_11100_11 : CSRRW  <= 1'b1;
+	   32'b???????_?????_?????_010_?????_11100_11 : CSRRS  <= 1'b1;
+	   32'b???????_?????_?????_011_?????_11100_11 : CSRRC  <= 1'b1;
+	   32'b???????_?????_?????_101_?????_11100_11 : CSRRWI <= 1'b1;
+	   32'b???????_?????_?????_110_?????_11100_11 : CSRRSI <= 1'b1;
+	   32'b???????_?????_?????_111_?????_11100_11 : CSRRCI <= 1'b1;
+ 	   default : OTHER <= 1'b1;
+	 endcase
+      end
+   end
+
+`ifdef RISCV_FORMAL
+   reg [31:0] 	 pc = RESET_PC;
+
+   wire rs_en = two_stage_op ? init : i_ctrl_pc_en;
+
+   assign rvfi_rd_wdata = update_rd ? dbg_rd : 32'd0;
+
+   always @(posedge i_clk) begin
+      /* End of instruction */
+      rvfi_valid <= i_cnt_done & i_ctrl_pc_en & !i_rst;
+      rvfi_order <= rvfi_order + {63'd0,rvfi_valid};
+
+      /* Get instruction word when it's fetched from ibus */
+      if (i_ibus_cyc & i_ibus_ack)
+	rvfi_insn <= i_ibus_rdt;
+
+
+      if (i_cnt_done & i_ctrl_pc_en) begin
+         rvfi_pc_rdata <= pc;
+	 if (!(rd_en & (|i_rd_addr))) begin
+	   rvfi_rd_addr <= 5'd0;
+	 end
+      end
+      rvfi_trap <= trap;
+      if (rvfi_valid) begin
+         rvfi_trap <= 1'b0;
+         pc <= rvfi_pc_wdata;
+      end
+
+      /* RS1 not valid during J, U instructions (immdec_en[1]) */
+      /* RS2 not valid during I, J, U instructions (immdec_en[2]) */
+      if (i_rf_ready) begin
+	 rvfi_rs1_addr <= !immdec_en[1] ? rs1_addr : 5'd0;
+         rvfi_rs2_addr <= !immdec_en[2] /*rs2_valid*/ ? rs2_addr : 5'd0;
+	 rvfi_rd_addr  <= i_rd_addr;
+      end
+      if (rs_en) begin
+         rvfi_rs1_rdata <= {(!immdec_en[1] ? rs1 : {W{1'b0}}),rvfi_rs1_rdata[31:W]};
+         rvfi_rs2_rdata <= {(!immdec_en[2] ? rs2 : {W{1'b0}}),rvfi_rs2_rdata[31:W]};
+      end
+
+      if (i_dbus_ack) begin
+         rvfi_mem_addr  <= i_dbus_adr;
+         rvfi_mem_rmask <= i_dbus_we ? 4'b0000 : i_dbus_sel;
+         rvfi_mem_wmask <= i_dbus_we ? i_dbus_sel : 4'b0000;
+         rvfi_mem_rdata <= i_dbus_rdt;
+         rvfi_mem_wdata <= i_dbus_dat;
+      end
+      if (i_ibus_ack) begin
+         rvfi_mem_rmask <= 4'b0000;
+         rvfi_mem_wmask <= 4'b0000;
+      end
+   end
+
+   assign rvfi_pc_wdata = i_ibus_adr;
+
+`endif
+
+endmodule
+/* Copyright lowRISC contributors.
+Copyright 2018 ETH Zurich and University of Bologna, see also CREDITS.md.
+Licensed under the Apache License, Version 2.0, see LICENSE for details.
+SPDX-License-Identifier: Apache-2.0
+
+* Adapted to SERV by @Abdulwadoodd as part of the project under spring '22 LFX Mentorship program */
+
+/* Decodes RISC-V compressed instructions into their RV32i equivalent. */
+
+module serv_compdec
+  (
+   input wire i_clk,
+   input  wire [31:0] i_instr,
+   input  wire i_ack,
+   output wire [31:0] o_instr,
+   output reg o_iscomp);
+
+  localparam OPCODE_LOAD     = 7'h03;
+  localparam OPCODE_OP_IMM   = 7'h13;
+  localparam OPCODE_STORE    = 7'h23;
+  localparam OPCODE_OP       = 7'h33;
+  localparam OPCODE_LUI      = 7'h37;
+  localparam OPCODE_BRANCH   = 7'h63;
+  localparam OPCODE_JALR     = 7'h67;
+  localparam OPCODE_JAL      = 7'h6f;
+
+  reg  [31:0] comp_instr;
+  reg  illegal_instr;
+
+  assign o_instr = illegal_instr ? i_instr : comp_instr;
+
+  always @(posedge i_clk) begin
+    if(i_ack)
+      o_iscomp <= !illegal_instr;
+  end
+
+  always @ (*) begin
+    // By default, forward incoming instruction, mark it as legal.
+    comp_instr    = i_instr;
+    illegal_instr = 1'b0;
+
+    // Check if incoming instruction is compressed.
+    case (i_instr[1:0])
+      // C0
+      2'b00: begin
+        case (i_instr[15:14])
+          2'b00: begin
+            // c.addi4spn -> addi rd', x2, imm
+            comp_instr = {2'b0, i_instr[10:7], i_instr[12:11], i_instr[5],
+                      i_instr[6], 2'b00, 5'h02, 3'b000, 2'b01, i_instr[4:2], {OPCODE_OP_IMM}};
+          end
+
+          2'b01: begin
+            // c.lw -> lw rd', imm(rs1')
+            comp_instr = {5'b0, i_instr[5], i_instr[12:10], i_instr[6],
+                      2'b00, 2'b01, i_instr[9:7], 3'b010, 2'b01, i_instr[4:2], {OPCODE_LOAD}};
+          end
+
+          2'b11: begin
+            // c.sw -> sw rs2', imm(rs1')
+            comp_instr = {5'b0, i_instr[5], i_instr[12], 2'b01, i_instr[4:2],
+                      2'b01, i_instr[9:7], 3'b010, i_instr[11:10], i_instr[6],
+                      2'b00, {OPCODE_STORE}};
+          end
+
+          2'b10: begin
+            illegal_instr = 1'b1;
+          end
+
+        endcase
+      end
+
+      // C1
+
+      // Register address checks for RV32E are performed in the regular instruction decoder.
+      // If this check fails, an illegal instruction exception is triggered and the controller
+      // writes the actual faulting instruction to mtval.
+      2'b01: begin
+        case (i_instr[15:13])
+          3'b000: begin
+            // c.addi -> addi rd, rd, nzimm
+            // c.nop
+            comp_instr = {{6 {i_instr[12]}}, i_instr[12], i_instr[6:2],
+                      i_instr[11:7], 3'b0, i_instr[11:7], {OPCODE_OP_IMM}};
+          end
+
+          3'b001, 3'b101: begin
+            // 001: c.jal -> jal x1, imm
+            // 101: c.j   -> jal x0, imm
+            comp_instr = {i_instr[12], i_instr[8], i_instr[10:9], i_instr[6],
+                      i_instr[7], i_instr[2], i_instr[11], i_instr[5:3],
+                      {9 {i_instr[12]}}, 4'b0, ~i_instr[15], {OPCODE_JAL}};
+          end
+
+          3'b010: begin
+            // c.li -> addi rd, x0, nzimm
+            // (c.li hints are translated into an addi hint)
+            comp_instr = {{6 {i_instr[12]}}, i_instr[12], i_instr[6:2], 5'b0,
+                      3'b0, i_instr[11:7], {OPCODE_OP_IMM}};
+          end
+
+          3'b011: begin
+            // c.lui -> lui rd, imm
+            // (c.lui hints are translated into a lui hint)
+            comp_instr = {{15 {i_instr[12]}}, i_instr[6:2], i_instr[11:7], {OPCODE_LUI}};
+
+            if (i_instr[11:7] == 5'h02) begin
+              // c.addi16sp -> addi x2, x2, nzimm
+              comp_instr = {{3 {i_instr[12]}}, i_instr[4:3], i_instr[5], i_instr[2],
+                        i_instr[6], 4'b0, 5'h02, 3'b000, 5'h02, {OPCODE_OP_IMM}};
+            end
+
+          end
+
+          3'b100: begin
+            case (i_instr[11:10])
+              2'b00,
+              2'b01: begin
+                // 00: c.srli -> srli rd, rd, shamt
+                // 01: c.srai -> srai rd, rd, shamt
+                // (c.srli/c.srai hints are translated into a srli/srai hint)
+                comp_instr = {1'b0, i_instr[10], 5'b0, i_instr[6:2], 2'b01, i_instr[9:7],
+                          3'b101, 2'b01, i_instr[9:7], {OPCODE_OP_IMM}};
+              end
+
+              2'b10: begin
+                // c.andi -> andi rd, rd, imm
+                comp_instr = {{6 {i_instr[12]}}, i_instr[12], i_instr[6:2], 2'b01, i_instr[9:7],
+                          3'b111, 2'b01, i_instr[9:7], {OPCODE_OP_IMM}};
+              end
+
+              2'b11: begin
+                case (i_instr[6:5])
+                  2'b00: begin
+                    // c.sub -> sub rd', rd', rs2'
+                    comp_instr = {2'b01, 5'b0, 2'b01, i_instr[4:2], 2'b01, i_instr[9:7],
+                                  3'b000, 2'b01, i_instr[9:7], {OPCODE_OP}};
+                  end
+
+                  2'b01: begin
+                    // c.xor -> xor rd', rd', rs2'
+                    comp_instr = {7'b0, 2'b01, i_instr[4:2], 2'b01, i_instr[9:7], 3'b100,
+                              2'b01, i_instr[9:7], {OPCODE_OP}};
+                  end
+
+                  2'b10: begin
+                    // c.or  -> or  rd', rd', rs2'
+                    comp_instr = {7'b0, 2'b01, i_instr[4:2], 2'b01, i_instr[9:7], 3'b110,
+                              2'b01, i_instr[9:7], {OPCODE_OP}};
+                  end
+
+                  2'b11: begin
+                    // c.and -> and rd', rd', rs2'
+                    comp_instr = {7'b0, 2'b01, i_instr[4:2], 2'b01, i_instr[9:7], 3'b111,
+                              2'b01, i_instr[9:7], {OPCODE_OP}};
+                  end
+                endcase
+              end
+            endcase
+          end
+
+          3'b110, 3'b111: begin
+            // 0: c.beqz -> beq rs1', x0, imm
+            // 1: c.bnez -> bne rs1', x0, imm
+            comp_instr = {{4 {i_instr[12]}}, i_instr[6:5], i_instr[2], 5'b0, 2'b01,
+                      i_instr[9:7], 2'b00, i_instr[13], i_instr[11:10], i_instr[4:3],
+                      i_instr[12], {OPCODE_BRANCH}};
+          end
+        endcase
+      end
+
+      // C2
+
+      // Register address checks for RV32E are performed in the regular instruction decoder.
+      // If this check fails, an illegal instruction exception is triggered and the controller
+      // writes the actual faulting instruction to mtval.
+      2'b10: begin
+        case (i_instr[15:14])
+          2'b00: begin
+            // c.slli -> slli rd, rd, shamt
+            // (c.ssli hints are translated into a slli hint)
+            comp_instr = {7'b0, i_instr[6:2], i_instr[11:7], 3'b001, i_instr[11:7], {OPCODE_OP_IMM}};
+          end
+
+          2'b01: begin
+            // c.lwsp -> lw rd, imm(x2)
+            comp_instr = {4'b0, i_instr[3:2], i_instr[12], i_instr[6:4], 2'b00, 5'h02,
+                      3'b010, i_instr[11:7], OPCODE_LOAD};
+          end
+
+          2'b10: begin
+            if (i_instr[12] == 1'b0) begin
+              if (i_instr[6:2] != 5'b0) begin
+                // c.mv -> add rd/rs1, x0, rs2
+                // (c.mv hints are translated into an add hint)
+                comp_instr = {7'b0, i_instr[6:2], 5'b0, 3'b0, i_instr[11:7], {OPCODE_OP}};
+              end else begin
+                // c.jr -> jalr x0, rd/rs1, 0
+                comp_instr = {12'b0, i_instr[11:7], 3'b0, 5'b0, {OPCODE_JALR}};
+              end
+            end else begin
+              if (i_instr[6:2] != 5'b0) begin
+                // c.add -> add rd, rd, rs2
+                // (c.add hints are translated into an add hint)
+                comp_instr = {7'b0, i_instr[6:2], i_instr[11:7], 3'b0, i_instr[11:7], {OPCODE_OP}};
+              end else begin
+                if (i_instr[11:7] == 5'b0) begin
+                  // c.ebreak -> ebreak
+                  comp_instr = {32'h00_10_00_73};
+                end else begin
+                  // c.jalr -> jalr x1, rs1, 0
+                  comp_instr = {12'b0, i_instr[11:7], 3'b000, 5'b00001, {OPCODE_JALR}};
+                end
+              end
+            end
+          end
+
+          2'b11: begin
+            // c.swsp -> sw rs2, imm(x2)
+            comp_instr = {4'b0, i_instr[8:7], i_instr[12], i_instr[6:2], 5'h02, 3'b010,
+                      i_instr[11:9], 2'b00, {OPCODE_STORE}};
+          end
+        endcase
+      end
+
+      // Incoming instruction is not compressed.
+      2'b11: illegal_instr = 1'b1;
+
+    endcase
+  end
+
+  endmodule
+module serv_aligner
+   (
+    input wire clk,
+    input wire rst,
+    // serv_top
+    input  wire [31:0]  i_ibus_adr,
+    input  wire         i_ibus_cyc,
+    output wire [31:0]  o_ibus_rdt,
+    output wire         o_ibus_ack,
+    // serv_rf_top
+    output wire [31:0]  o_wb_ibus_adr,
+    output wire         o_wb_ibus_cyc,
+    input  wire [31:0]  i_wb_ibus_rdt,
+    input  wire         i_wb_ibus_ack);
+
+    wire [31:0] ibus_rdt_concat;
+    wire        ack_en;
+
+    reg  [15:0] lower_hw;
+    reg         ctrl_misal ;
+
+    /* From SERV core to Memory
+
+    o_wb_ibus_adr: Carries address of instruction to memory. In case of misaligned access,
+    which is caused by pc+2 due to compressed instruction, next instruction is fetched
+    by pc+4 and concatenation is done to make the instruction aligned.
+
+    o_wb_ibus_cyc: Simply forwarded from SERV to Memory and is only altered by memory or SERV core.
+    */
+    assign o_wb_ibus_adr = ctrl_misal ? (i_ibus_adr+32'b100) : i_ibus_adr;
+    assign o_wb_ibus_cyc = i_ibus_cyc;
+
+    /* From Memory to SERV core
+
+        o_ibus_ack: Instruction bus acknowledge is send to SERV only when the aligned instruction,
+        either compressed or un-compressed, is ready to dispatch.
+
+        o_ibus_rdt: Carries the instruction from memory to SERV core. It can be either aligned
+        instruction coming from memory or made aligned by two bus transactions and concatenation.
+    */
+    assign o_ibus_ack = i_wb_ibus_ack & ack_en;
+    assign o_ibus_rdt = ctrl_misal ? ibus_rdt_concat : i_wb_ibus_rdt;
+
+    /* 16-bit register used to hold the upper half word of the current instruction in-case
+       concatenation will be required with the upper half word of upcoming instruction
+    */
+    always @(posedge clk) begin
+        if(i_wb_ibus_ack)begin
+            lower_hw <= i_wb_ibus_rdt[31:16];
+        end
+    end
+
+    assign ibus_rdt_concat = {i_wb_ibus_rdt[15:0],lower_hw};
+
+    /* Two control signals: ack_en, ctrl_misal are set to control the bus transactions between
+    SERV core and the memory
+    */
+    assign ack_en   = !(i_ibus_adr[1] & !ctrl_misal);
+
+    always @(posedge clk ) begin
+        if(rst)
+            ctrl_misal <= 0;
+        else if(i_wb_ibus_ack & i_ibus_adr[1])
+            ctrl_misal <= !ctrl_misal;
+    end
+
+endmodule
+`default_nettype none
+module serv_csr
+  #(
+    parameter RESET_STRATEGY = "MINI",
+    parameter W = 1,
+    parameter B = W-1
+  )
+  (
+   input wire 	    i_clk,
+   input wire 	    i_rst,
+   //State
+   input wire 	    i_trig_irq,
+   input wire 	    i_en,
+   input wire 	    i_cnt0to3,
+   input wire 	    i_cnt3,
+   input wire 	    i_cnt7,
+   input wire 	    i_cnt11,
+   input wire 	    i_cnt12,
+   input wire 	    i_cnt_done,
+   input wire 	    i_mem_op,
+   input wire 	    i_mtip,
+   input wire 	    i_trap,
+   output reg 	    o_new_irq,
+   //Control
+   input wire 	    i_e_op,
+   input wire 	    i_ebreak,
+   input wire 	    i_mem_cmd,
+   input wire 	    i_mstatus_en,
+   input wire 	    i_mie_en,
+   input wire 	    i_mcause_en,
+   input wire [1:0] i_csr_source,
+   input wire 	    i_mret,
+   input wire 	    i_csr_d_sel,
+   //Data
+   input wire 	[B:0]    i_rf_csr_out,
+   output wire 	[B:0]    o_csr_in,
+   input wire 	[B:0]    i_csr_imm,
+   input wire 	[B:0]    i_rs1,
+   output wire 	[B:0]    o_q);
+
+   localparam [1:0]
+     CSR_SOURCE_CSR = 2'b00,
+     CSR_SOURCE_EXT = 2'b01,
+     CSR_SOURCE_SET = 2'b10,
+     CSR_SOURCE_CLR = 2'b11;
+
+   reg 		    mstatus_mie;
+   reg 		    mstatus_mpie;
+   reg 		    mie_mtie;
+
+   reg 		mcause31;
+   reg [3:0] 	mcause3_0;
+   wire [B:0]	mcause;
+
+   wire [B:0]	csr_in;
+   wire [B:0]	csr_out;
+
+   reg 		timer_irq_r;
+
+   wire [B:0]	d = i_csr_d_sel ? i_csr_imm : i_rs1;
+
+   assign csr_in = (i_csr_source == CSR_SOURCE_EXT) ? d :
+		   (i_csr_source == CSR_SOURCE_SET) ? csr_out | d :
+		   (i_csr_source == CSR_SOURCE_CLR) ? csr_out & ~d :
+		   (i_csr_source == CSR_SOURCE_CSR) ? csr_out :
+		   {W{1'bx}};
+
+   wire [B:0]	mstatus;
+
+   generate
+      if (W==1) begin : gen_mstatus_w1
+	 assign mstatus = ((mstatus_mie & i_cnt3) | (i_cnt11 | i_cnt12));
+      end else if (W==4) begin : gen_mstatus_w4
+	 assign mstatus = {i_cnt11 | (mstatus_mie & i_cnt3), 2'b00, i_cnt12};
+      end
+   endgenerate
+
+   assign csr_out = ({W{i_mstatus_en & i_en}} & mstatus) |
+		    i_rf_csr_out |
+		    ({W{i_mcause_en & i_en}} & mcause);
+
+   assign o_q = csr_out;
+
+   wire 	timer_irq = i_mtip & mstatus_mie & mie_mtie;
+
+   assign mcause = i_cnt0to3 ? mcause3_0[B:0] : //[3:0]
+		   i_cnt_done ? {mcause31,{B{1'b0}}} //[31]
+		   : {W{1'b0}};
+
+   assign o_csr_in = csr_in;
+
+   always @(posedge i_clk) begin
+      if (i_trig_irq) begin
+	 timer_irq_r <= timer_irq;
+	 o_new_irq   <= timer_irq & !timer_irq_r;
+      end
+
+      if (i_mie_en & i_cnt7)
+	mie_mtie <= csr_in[B];
+
+      /*
+       The mie bit in mstatus gets updated under three conditions
+
+       When a trap is taken, the bit is cleared
+       During an mret instruction, the bit is restored from mpie
+       During a mstatus CSR access instruction it's assigned when
+        bit 3 gets updated
+
+       These conditions are all mutually exclusive
+       */
+      if ((i_trap & i_cnt_done) | i_mstatus_en & i_cnt3 & i_en | i_mret)
+	mstatus_mie <= !i_trap & (i_mret ?  mstatus_mpie : csr_in[B]);
+
+      /*
+       Note: To save resources mstatus_mpie (mstatus bit 7) is not
+       readable or writable from sw
+       */
+      if (i_trap & i_cnt_done)
+	mstatus_mpie <= mstatus_mie;
+
+      /*
+       The four lowest bits in mcause hold the exception code
+
+       These bits get updated under three conditions
+
+       During an mcause CSR access function, they are assigned when
+       bits 0 to 3 gets updated
+
+       During an external interrupt the exception code is set to
+       7, since SERV only support timer interrupts
+
+       During an exception, the exception code is assigned to indicate
+       if it was caused by an ebreak instruction (3),
+       ecall instruction (11), misaligned load (4), misaligned store (6)
+       or misaligned jump (0)
+
+       The expressions below are derived from the following truth table
+       irq  => 0111 (timer=7)
+       e_op => x011 (ebreak=3, ecall=11)
+       mem  => 01x0 (store=6, load=4)
+       ctrl => 0000 (jump=0)
+       */
+      if (i_mcause_en & i_en & i_cnt0to3 | (i_trap & i_cnt_done)) begin
+	 mcause3_0[3] <= (i_e_op & !i_ebreak) | (!i_trap & csr_in[B]);
+	 mcause3_0[2] <= o_new_irq | i_mem_op | (!i_trap & ((W == 1) ? mcause3_0[3] : csr_in[(W == 1) ? 0 : 2]));
+	 mcause3_0[1] <= o_new_irq | i_e_op | (i_mem_op & i_mem_cmd) | (!i_trap & ((W == 1) ? mcause3_0[2] : csr_in[(W == 1) ? 0 : 1]));
+	 mcause3_0[0] <= o_new_irq | i_e_op | (!i_trap & ((W == 1) ? mcause3_0[1] : csr_in[0]));
+      end
+      if (i_mcause_en & i_cnt_done | i_trap)
+	mcause31 <= i_trap ? o_new_irq : csr_in[B];
+      if (i_rst)
+	if (RESET_STRATEGY != "NONE") begin
+	   o_new_irq <= 1'b0;
+	   mie_mtie <= 1'b0;
+	end
+   end
+
+endmodule
+`default_nettype none
+module serv_mem_if
+  #(
+    parameter [0:0] WITH_CSR = 1,
+    parameter	    W = 1,
+    parameter	    B = W-1
+  )
+  (
+   input wire 	     i_clk,
+   //State
+   input wire [1:0]  i_bytecnt,
+   input wire [1:0]  i_lsb,
+   output wire 	     o_misalign,
+   //Control
+   input wire 	     i_signed,
+   input wire 	     i_word,
+   input wire 	     i_half,
+   //MDU
+   input wire 	     i_mdu_op,
+   //Data
+   input wire [B:0] i_bufreg2_q,
+   output wire [B:0] o_rd,
+   //External interface
+   output wire [3:0] o_wb_sel);
+
+   reg signbit;
+
+   wire dat_valid =
+	i_mdu_op |
+	i_word |
+	(i_bytecnt == 2'b00) |
+	(i_half & !i_bytecnt[1]);
+
+   assign o_rd = dat_valid ? i_bufreg2_q : {W{i_signed & signbit}};
+
+   assign o_wb_sel[3] = (i_lsb == 2'b11) | i_word | (i_half & i_lsb[1]);
+   assign o_wb_sel[2] = (i_lsb == 2'b10) | i_word;
+   assign o_wb_sel[1] = (i_lsb == 2'b01) | i_word | (i_half & !i_lsb[1]);
+   assign o_wb_sel[0] = (i_lsb == 2'b00);
+
+   always @(posedge i_clk) begin
+      if (dat_valid)
+        signbit <= i_bufreg2_q[B];
+   end
+
+   /*
+    mem_misalign is checked after the init stage to decide whether to do a data
+    bus transaction or go to the trap state. It is only guaranteed to be correct
+    at this time
+    */
+   assign o_misalign = WITH_CSR & ((i_lsb[0] & (i_word | i_half)) | (i_lsb[1] & i_word));
+
+endmodule
+`default_nettype none
+module serv_rf_if
+  #(parameter WITH_CSR = 1,
+    parameter W = 1,
+    parameter B = W-1
+  )
+  (//RF Interface
+   input wire 		      i_cnt_en,
+   output wire [4+WITH_CSR:0] o_wreg0,
+   output wire [4+WITH_CSR:0] o_wreg1,
+   output wire 		      o_wen0,
+   output wire 		      o_wen1,
+   output wire [B:0]  o_wdata0,
+   output wire [B:0]  o_wdata1,
+   output wire [4+WITH_CSR:0] o_rreg0,
+   output wire [4+WITH_CSR:0] o_rreg1,
+   input wire  [B:0] i_rdata0,
+   input wire  [B:0] i_rdata1,
+
+   //Trap interface
+   input wire 		      i_trap,
+   input wire 		      i_mret,
+   input wire [B:0] i_mepc,
+   input wire                      i_mtval_pc,
+   input wire [B:0] i_bufreg_q,
+   input wire [B:0] i_bad_pc,
+   output wire [B:0] o_csr_pc,
+   //CSR interface
+   input wire 		      i_csr_en,
+   input wire [1:0] 	      i_csr_addr,
+   input wire [B:0] i_csr,
+   output wire [B:0] o_csr,
+   //RD write port
+   input wire 		      i_rd_wen,
+   input wire [4:0] 	      i_rd_waddr,
+   input wire [B:0] i_ctrl_rd,
+   input wire [B:0] i_alu_rd,
+   input wire 		      i_rd_alu_en,
+   input wire [B:0] i_csr_rd,
+   input wire 		      i_rd_csr_en,
+   input wire [B:0] i_mem_rd,
+   input wire 		      i_rd_mem_en,
+
+   //RS1 read port
+   input wire [4:0] 	      i_rs1_raddr,
+   output wire [B:0] o_rs1,
+   //RS2 read port
+   input wire [4:0] 	      i_rs2_raddr,
+   output wire [B:0] o_rs2);
+
+
+   /*
+    ********** Write side ***********
+    */
+
+   wire 	     rd_wen = i_rd_wen & (|i_rd_waddr);
+
+   generate
+   if (|WITH_CSR) begin : gen_csr
+   wire [B:0] rd =
+       {W{i_rd_alu_en}} & i_alu_rd |
+       {W{i_rd_csr_en}} & i_csr_rd |
+       {W{i_rd_mem_en}} & i_mem_rd |
+                       i_ctrl_rd;
+
+   wire [B:0]  mtval = i_mtval_pc ? i_bad_pc : i_bufreg_q;
+
+   assign 	     o_wdata0 = i_trap ? mtval  : rd;
+   assign	     o_wdata1 = i_trap ? i_mepc : i_csr;
+
+   /* Port 0 handles writes to mtval during traps and rd otherwise
+    * Port 1 handles writes to mepc during traps and csr accesses otherwise
+    *
+    * GPR registers are mapped to address 0-31 (bits 0xxxxx).
+    * Following that are four CSR registers
+    * mscratch 100000
+    * mtvec    100001
+    * mepc     100010
+    * mtval    100011
+    */
+
+   assign o_wreg0 = i_trap ? {6'b100011} : {1'b0,i_rd_waddr};
+   assign o_wreg1 = i_trap ? {6'b100010} : {4'b1000,i_csr_addr};
+
+   assign       o_wen0 = i_cnt_en & (i_trap | rd_wen);
+   assign       o_wen1 = i_cnt_en & (i_trap | i_csr_en);
+
+   /*
+    ********** Read side ***********
+    */
+
+   //0 : RS1
+   //1 : RS2 / CSR
+
+   assign o_rreg0 = {1'b0, i_rs1_raddr};
+
+   /*
+    The address of the second read port (o_rreg1) can get assigned from four
+    different sources
+
+    Normal operations : i_rs2_raddr
+    CSR access        : i_csr_addr
+    trap              : MTVEC
+    mret              : MEPC
+
+    Address 0-31 in the RF are assigned to the GPRs. After that follows the four
+    CSRs on addresses 32-35
+
+    32 MSCRATCH
+    33 MTVEC
+    34 MEPC
+    35 MTVAL
+
+    The expression below is an optimized version of this logic
+    */
+   wire sel_rs2 = !(i_trap | i_mret | i_csr_en);
+   assign o_rreg1 = {~sel_rs2,
+		     i_rs2_raddr[4:2] & {3{sel_rs2}},
+		     {1'b0,i_trap} | {i_mret,1'b0} | ({2{i_csr_en}} & i_csr_addr) | ({2{sel_rs2}} & i_rs2_raddr[1:0])};
+
+   assign o_rs1 = i_rdata0;
+   assign o_rs2 = i_rdata1;
+   assign o_csr = i_rdata1 & {W{i_csr_en}};
+   assign o_csr_pc = i_rdata1;
+
+   end else begin : gen_no_csr
+      wire [B:0] rd = (i_ctrl_rd) |
+          i_alu_rd  & {W{i_rd_alu_en}} |
+          i_mem_rd  & {W{i_rd_mem_en}};
+
+      assign 	     o_wdata0 = rd;
+      assign	     o_wdata1 = {W{1'b0}};
+
+      assign o_wreg0 = i_rd_waddr;
+      assign o_wreg1 = 5'd0;
+
+      assign       o_wen0 = i_cnt_en & rd_wen;
+      assign       o_wen1 = 1'b0;
+
+   /*
+    ********** Read side ***********
+    */
+
+      assign o_rreg0 = i_rs1_raddr;
+      assign o_rreg1 = i_rs2_raddr;
+
+      assign o_rs1 = i_rdata0;
+      assign o_rs2 = i_rdata1;
+      assign o_csr = {W{1'b0}};
+      assign o_csr_pc = {W{1'b0}};
+   end // else: !if(WITH_CSR)
+   endgenerate
+endmodule
 `default_nettype none
 module serv_alu
   #(
@@ -78,101 +1086,6 @@ module serv_alu
       if (i_en)
 	cmp_r <= o_cmp;
    end
-
-endmodule
-module serv_bufreg #(
-      parameter [0:0] MDU = 0,
-      parameter W = 1,
-      parameter B = W-1
-)(
-   input wire 	      i_clk,
-   //State
-   input wire 	      i_cnt0,
-   input wire 	      i_cnt1,
-   input wire 	      i_cnt_done,
-   input wire 	      i_en,
-   input wire 	      i_init,
-   input wire           i_mdu_op,
-   output wire [1:0]    o_lsb,
-   //Control
-   input wire 	      i_rs1_en,
-   input wire 	      i_imm_en,
-   input wire 	      i_clr_lsb,
-   input wire 	      i_shift_op,
-   input wire 	      i_right_shift_op,
-   input wire [2:0]   i_shamt,
-   input wire 	      i_sh_signed,
-   //Data
-   input wire [B:0] i_rs1,
-   input wire [B:0] i_imm,
-   output wire [B:0] o_q,
-   //External
-   output wire [31:0] o_dbus_adr,
-   //Extension
-   output wire [31:0] o_ext_rs1);
-
-   wire		      c;
-   wire [B:0]	      q;
-   reg [B:0]	      c_r;
-   reg [31:0]	      data;
-   wire [B:0]	      clr_lsb;
-
-   assign clr_lsb[0] = i_cnt0 & i_clr_lsb;
-
-   generate
-      if (W > 1) begin : gen_clr_lsb_w_gt_1
-         assign  clr_lsb[B:1] = {B{1'b0}};
-      end
-   endgenerate
-
-   assign {c,q} = {1'b0,(i_rs1 & {W{i_rs1_en}})} + {1'b0,(i_imm & {W{i_imm_en}} & ~clr_lsb)} + c_r;
-
-   always @(posedge i_clk) begin
-      //Make sure carry is cleared before loading new data
-      c_r    <= {W{1'b0}};
-      c_r[0] <= c & i_en;
-   end
-
-   generate
-      if (W == 1) begin : gen_w_eq_1
-	 always @(posedge i_clk) begin
-	    if (i_en)
-	      data[31:2] <= {i_init ? q : {W{data[31] & i_sh_signed}}, data[31:3]};
-
-	    if (i_init ? (i_cnt0 | i_cnt1) : i_en)
-	      data[1:0] <= {i_init ? q : data[2], data[1]};
-	 end
-	 assign o_lsb = (MDU & i_mdu_op) ? 2'b00 : data[1:0];
-	 assign o_q = data[0] & {W{i_en}};
-      end else if (W == 4) begin : gen_lsb_w_4
-	 reg [1:0] lsb;
-	 reg [W-2:0] data_tail;
-
-	 wire [2:0] shift_amount
-	   = !i_shift_op ? 3'd3 :
-	     i_right_shift_op ? (3'd3+{1'b0,i_shamt[1:0]}) :
-	     ({1'b0,~i_shamt[1:0]});
-
-	 always @(posedge i_clk) begin
-            if (i_en)
-              if (i_cnt0) lsb <= q[1:0];
-	    if (i_en)
-              data <= {i_init ? q : {W{i_sh_signed & data[31]}}, data[31:W]};
-	    if (i_en)
-	      data_tail <= data[B:1] & {B{~i_cnt_done}};
-	 end
-
-	 wire [2*W+B-2:0] muxdata = {data[W+B-1:0],data_tail};
-	 wire [B:0]	  muxout = muxdata[{1'b0,shift_amount}+:W];
-
-	 assign o_lsb = (MDU & i_mdu_op) ? 2'b00 : lsb;
-	 assign o_q = i_en ? muxout : {W{1'b0}};
-      end
-   endgenerate
-
-
-   assign o_dbus_adr = {data[31:2], 2'b00};
-   assign o_ext_rs1  = data;
 
 endmodule
 module serv_bufreg2
@@ -274,114 +1187,329 @@ module serv_bufreg2
    end
 
 endmodule
-`default_nettype none
-module serv_ctrl
-  #(parameter RESET_STRATEGY = "MINI",
-    parameter RESET_PC = 32'd0,
-    parameter WITH_CSR = 1,
-    parameter W = 1,
-    parameter B = W-1
-  )
-  (
-   input wire 	     clk,
-   input wire 	     i_rst,
+module serv_bufreg #(
+      parameter [0:0] MDU = 0,
+      parameter W = 1,
+      parameter B = W-1
+)(
+   input wire 	      i_clk,
    //State
-   input wire 	     i_pc_en,
-   input wire 	     i_cnt12to31,
-   input wire 	     i_cnt0,
-   input wire        i_cnt1,
-   input wire 	     i_cnt2,
+   input wire 	      i_cnt0,
+   input wire 	      i_cnt1,
+   input wire 	      i_cnt_done,
+   input wire 	      i_en,
+   input wire 	      i_init,
+   input wire           i_mdu_op,
+   output wire [1:0]    o_lsb,
    //Control
-   input wire 	     i_jump,
-   input wire 	     i_jal_or_jalr,
-   input wire 	     i_utype,
-   input wire 	     i_pc_rel,
-   input wire 	     i_trap,
-   input wire        i_iscomp,
+   input wire 	      i_rs1_en,
+   input wire 	      i_imm_en,
+   input wire 	      i_clr_lsb,
+   input wire 	      i_shift_op,
+   input wire 	      i_right_shift_op,
+   input wire [2:0]   i_shamt,
+   input wire 	      i_sh_signed,
    //Data
+   input wire [B:0] i_rs1,
    input wire [B:0] i_imm,
-   input wire [B:0] i_buf,
-   input wire [B:0] i_csr_pc,
-   output wire [B:0] o_rd,
-   output wire [B:0] o_bad_pc,
+   output wire [B:0] o_q,
    //External
-   output reg [31:0] o_ibus_adr);
+   output wire [31:0] o_dbus_adr,
+   //Extension
+   output wire [31:0] o_ext_rs1);
 
-   wire [B:0] pc_plus_4;
-   wire       pc_plus_4_cy;
-   reg 	      pc_plus_4_cy_r;
-   wire [B:0] pc_plus_4_cy_r_w;
-   wire [B:0] pc_plus_offset;
-   wire       pc_plus_offset_cy;
-   reg	      pc_plus_offset_cy_r;
-   wire [B:0] pc_plus_offset_cy_r_w;
-   wire [B:0] pc_plus_offset_aligned;
-   wire [B:0] plus_4;
+   wire		      c;
+   wire [B:0]	      q;
+   reg [B:0]	      c_r;
+   reg [31:0]	      data;
+   wire [B:0]	      clr_lsb;
 
-   wire [B:0] pc = o_ibus_adr[B:0];
-
-   wire [B:0] new_pc;
-
-   wire [B:0] offset_a;
-   wire [B:0] offset_b;
-
-  /*  If i_iscomp=1: increment pc by 2 else increment pc by 4  */
+   assign clr_lsb[0] = i_cnt0 & i_clr_lsb;
 
    generate
-      if (W == 1) begin : gen_plus_4_w_eq_1
-	 assign plus_4 = i_iscomp ? i_cnt1 : i_cnt2;
-      end else if (W == 4) begin : gen_plus_4_w_eq_4
-	 assign plus_4 = (i_cnt0 | i_cnt1) ? (i_iscomp ? 2 : 4) : 0;
+      if (W > 1) begin : gen_clr_lsb_w_gt_1
+         assign  clr_lsb[B:1] = {B{1'b0}};
       end
    endgenerate
 
-   assign o_bad_pc = pc_plus_offset_aligned;
+   assign {c,q} = {1'b0,(i_rs1 & {W{i_rs1_en}})} + {1'b0,(i_imm & {W{i_imm_en}} & ~clr_lsb)} + c_r;
 
-   assign {pc_plus_4_cy,pc_plus_4} = pc+plus_4+pc_plus_4_cy_r_w;
+   always @(posedge i_clk) begin
+      //Make sure carry is cleared before loading new data
+      c_r    <= {W{1'b0}};
+      c_r[0] <= c & i_en;
+   end
 
    generate
-      if (|WITH_CSR) begin : gen_csr
-	 if (W == 1) begin : gen_new_pc_w_eq_1
-	    assign new_pc = i_trap ? (i_csr_pc & !(i_cnt0 || i_cnt1)) : i_jump ? pc_plus_offset_aligned : pc_plus_4;
-         end else if (W == 4) begin : gen_new_pc_w_eq_4
-	    assign new_pc = i_trap ? (i_csr_pc & ((i_cnt0 || i_cnt1) ? 4'b1100 : 4'b1111)) : i_jump ? pc_plus_offset_aligned : pc_plus_4;
+      if (W == 1) begin : gen_w_eq_1
+	 always @(posedge i_clk) begin
+	    if (i_en)
+	      data[31:2] <= {i_init ? q : {W{data[31] & i_sh_signed}}, data[31:3]};
+
+	    if (i_init ? (i_cnt0 | i_cnt1) : i_en)
+	      data[1:0] <= {i_init ? q : data[2], data[1]};
 	 end
-      end else begin : gen_no_csr
-	 assign new_pc = i_jump ? pc_plus_offset_aligned : pc_plus_4;
+	 assign o_lsb = (MDU & i_mdu_op) ? 2'b00 : data[1:0];
+	 assign o_q = data[0] & {W{i_en}};
+      end else if (W == 4) begin : gen_lsb_w_4
+	 reg [1:0] lsb;
+	 reg [W-2:0] data_tail;
+
+	 wire [2:0] shift_amount
+	   = !i_shift_op ? 3'd3 :
+	     i_right_shift_op ? (3'd3+{1'b0,i_shamt[1:0]}) :
+	     ({1'b0,~i_shamt[1:0]});
+
+	 always @(posedge i_clk) begin
+            if (i_en)
+              if (i_cnt0) lsb <= q[1:0];
+	    if (i_en)
+              data <= {i_init ? q : {W{i_sh_signed & data[31]}}, data[31:W]};
+	    if (i_en)
+	      data_tail <= data[B:1] & {B{~i_cnt_done}};
+	 end
+
+	 wire [2*W+B-2:0] muxdata = {data[W+B-1:0],data_tail};
+	 wire [B:0]	  muxout = muxdata[{1'b0,shift_amount}+:W];
+
+	 assign o_lsb = (MDU & i_mdu_op) ? 2'b00 : lsb;
+	 assign o_q = i_en ? muxout : {W{1'b0}};
       end
    endgenerate
-   assign o_rd  = ({W{i_utype}} & pc_plus_offset_aligned) | (pc_plus_4 & {W{i_jal_or_jalr}});
 
-   assign offset_a = {W{i_pc_rel}} & pc;
-   assign offset_b = i_utype ? (i_imm & {W{i_cnt12to31}}) : i_buf;
-   assign {pc_plus_offset_cy,pc_plus_offset} = offset_a+offset_b+pc_plus_offset_cy_r_w;
 
-   generate
-   if (W>1) begin : gen_w_gt_1
-	 assign pc_plus_offset_aligned[B:1] = pc_plus_offset[B:1];
-	 assign pc_plus_offset_cy_r_w[B:1] = {B{1'b0}};
-	 assign pc_plus_4_cy_r_w[B:1] = {B{1'b0}};
-   end
-   endgenerate
+   assign o_dbus_adr = {data[31:2], 2'b00};
+   assign o_ext_rs1  = data;
 
-   assign pc_plus_offset_aligned[0] = pc_plus_offset[0] & !i_cnt0;
-   assign pc_plus_offset_cy_r_w[0] = pc_plus_offset_cy_r;
-   assign pc_plus_4_cy_r_w[0] = pc_plus_4_cy_r;
+endmodule
+// SPDX-License-Identifier: ISC
+`default_nettype none
+module serv_immdec
+  #(parameter SHARED_RFADDR_IMM_REGS = 1,
+    parameter W = 1)
+  (
+   input wire 	     i_clk,
+   //State
+   input wire 	     i_cnt_en,
+   input wire 	     i_cnt_done,
+   //Control
+   input wire [3:0]  i_immdec_en,
+   input wire 	     i_csr_imm_en,
+   input wire [3:0]  i_ctrl,
+   output wire [4:0] o_rd_addr,
+   output wire [4:0] o_rs1_addr,
+   output wire [4:0] o_rs2_addr,
+   //Data
+   output wire [W-1:0] o_csr_imm,
+   output wire [W-1:0] o_imm,
+   //External
+   input wire 	     i_wb_en,
+   input wire [31:7] i_wb_rdt);
 
-   initial if (RESET_STRATEGY == "NONE") o_ibus_adr = RESET_PC;
+generate
+   if (W == 1) begin : gen_immdec_w_eq_1
+   reg 		     imm31;
 
-   always @(posedge clk) begin
-      pc_plus_4_cy_r <= i_pc_en & pc_plus_4_cy;
-      pc_plus_offset_cy_r <= i_pc_en & pc_plus_offset_cy;
+   reg [8:0]  imm19_12_20;
+   reg 	      imm7;
+   reg [5:0]  imm30_25;
+   reg [4:0]  imm24_20;
+   reg [4:0]  imm11_7;
 
-      if (RESET_STRATEGY == "NONE") begin
-	 if (i_pc_en)
-	   o_ibus_adr <= {new_pc, o_ibus_adr[31:W]};
-      end else begin
-	 if (i_pc_en | i_rst)
-	   o_ibus_adr <= i_rst ? RESET_PC : {new_pc, o_ibus_adr[31:W]};
+   assign o_csr_imm = imm19_12_20[4];
+
+   wire       signbit = imm31 & !i_csr_imm_en;
+
+      if (SHARED_RFADDR_IMM_REGS) begin : gen_shared_imm_regs
+	 assign o_rs1_addr = imm19_12_20[8:4];
+	 assign o_rs2_addr = imm24_20;
+	 assign o_rd_addr  = imm11_7;
+
+	 always @(posedge i_clk) begin
+	    if (i_wb_en) begin
+	       /* CSR immediates are always zero-extended, hence clear the signbit */
+	       imm31     <= i_wb_rdt[31];
+	    end
+	    if (i_wb_en | (i_cnt_en & i_immdec_en[1]))
+	      imm19_12_20 <= i_wb_en ? {i_wb_rdt[19:12],i_wb_rdt[20]} : {i_ctrl[3] ? signbit : imm24_20[0], imm19_12_20[8:1]};
+	    if (i_wb_en | (i_cnt_en))
+	      imm7        <= i_wb_en ? i_wb_rdt[7]                    : signbit;
+
+	    if (i_wb_en | (i_cnt_en & i_immdec_en[3]))
+	      imm30_25    <= i_wb_en ? i_wb_rdt[30:25] : {i_ctrl[2] ? imm7 : i_ctrl[1] ? signbit : imm19_12_20[0], imm30_25[5:1]};
+
+	    if (i_wb_en | (i_cnt_en & i_immdec_en[2]))
+	      imm24_20    <= i_wb_en ? i_wb_rdt[24:20] : {imm30_25[0], imm24_20[4:1]};
+
+	    if (i_wb_en | (i_cnt_en & i_immdec_en[0]))
+	      imm11_7     <= i_wb_en ? i_wb_rdt[11:7] : {imm30_25[0], imm11_7[4:1]};
+	 end
+      end else begin : gen_separate_imm_regs
+	 reg [4:0]  rd_addr;
+	 reg [4:0]  rs1_addr;
+	 reg [4:0]  rs2_addr;
+
+	 assign o_rd_addr  = rd_addr;
+	 assign o_rs1_addr = rs1_addr;
+	 assign o_rs2_addr = rs2_addr;
+	 always @(posedge i_clk) begin
+	    if (i_wb_en) begin
+	       /* CSR immediates are always zero-extended, hence clear the signbit */
+	       imm31       <= i_wb_rdt[31];
+	       imm19_12_20 <= {i_wb_rdt[19:12],i_wb_rdt[20]};
+	       imm7        <= i_wb_rdt[7];
+	       imm30_25    <= i_wb_rdt[30:25];
+	       imm24_20    <= i_wb_rdt[24:20];
+	       imm11_7     <= i_wb_rdt[11:7];
+
+               rd_addr  <= i_wb_rdt[11:7];
+               rs1_addr <= i_wb_rdt[19:15];
+               rs2_addr <= i_wb_rdt[24:20];
+	    end
+	    if (i_cnt_en) begin
+	       imm19_12_20 <= {i_ctrl[3] ? signbit : imm24_20[0], imm19_12_20[8:1]};
+	       imm7        <= signbit;
+	       imm30_25    <= {i_ctrl[2] ? imm7 : i_ctrl[1] ? signbit : imm19_12_20[0], imm30_25[5:1]};
+	       imm24_20    <= {imm30_25[0], imm24_20[4:1]};
+	       imm11_7     <= {imm30_25[0], imm11_7[4:1]};
+	    end
+	 end
+      end
+
+	 assign o_imm = i_cnt_done ? signbit : i_ctrl[0] ? imm11_7[0] : imm24_20[0];
+   end else begin : gen_immdec_w_eq_4
+   reg [4:0]	     rd_addr;
+   reg [4:0]	     rs1_addr;
+   reg [4:0]	     rs2_addr;
+
+   reg		     i31;
+   reg		     i30;
+   reg		     i29;
+   reg		     i28;
+   reg		     i27;
+   reg		     i26;
+   reg		     i25;
+   reg		     i24;
+   reg		     i23;
+   reg		     i22;
+   reg		     i21;
+   reg		     i20;
+   reg		     i19;
+   reg		     i18;
+   reg		     i17;
+   reg		     i16;
+   reg		     i15;
+   reg		     i14;
+   reg		     i13;
+   reg		     i12;
+   reg		     i11;
+   reg		     i10;
+   reg		     i9;
+   reg		     i8;
+   reg		     i7;
+
+   reg		     i7_2;
+   reg		     i20_2;
+
+   wire		     signbit = i31 & !i_csr_imm_en;
+
+   assign o_csr_imm[3] = i18;
+   assign o_csr_imm[2] = i17;
+   assign o_csr_imm[1] = i16;
+   assign o_csr_imm[0] = i15;
+
+   assign o_rd_addr  = rd_addr;
+   assign o_rs1_addr = rs1_addr;
+   assign o_rs2_addr = rs2_addr;
+   always @(posedge i_clk) begin
+      if (i_wb_en) begin
+	 //Common
+	 i31 <= i_wb_rdt[31];
+
+	 //Bit lane 3
+	 i19 <= i_wb_rdt[19];
+	 i15 <= i_wb_rdt[15];
+	 i20 <= i_wb_rdt[20];
+	 i7  <= i_wb_rdt[7];
+	 i27 <= i_wb_rdt[27];
+	 i23 <= i_wb_rdt[23];
+	 i10 <= i_wb_rdt[10];
+
+	 //Bit lane 2
+	 i22 <= i_wb_rdt[22];
+	 i9  <= i_wb_rdt[ 9];
+	 i26 <= i_wb_rdt[26];
+	 i30 <= i_wb_rdt[30];
+	 i14 <= i_wb_rdt[14];
+	 i18 <= i_wb_rdt[18];
+
+	 //Bit lane 1
+	 i21 <= i_wb_rdt[21];
+	 i8  <= i_wb_rdt[ 8];
+	 i25 <= i_wb_rdt[25];
+	 i29 <= i_wb_rdt[29];
+	 i13 <= i_wb_rdt[13];
+	 i17 <= i_wb_rdt[17];
+
+	 //Bit lane 0
+	 i11 <= i_wb_rdt[11];
+	 i7_2  <= i_wb_rdt[7 ];
+	 i20_2   <= i_wb_rdt[20];
+	 i24   <= i_wb_rdt[24];
+	 i28   <= i_wb_rdt[28];
+	 i12   <= i_wb_rdt[12];
+	 i16   <= i_wb_rdt[16];
+
+         rd_addr  <= i_wb_rdt[11:7];
+         rs1_addr <= i_wb_rdt[19:15];
+         rs2_addr <= i_wb_rdt[24:20];
+      end
+      if (i_cnt_en) begin
+	 //Bit lane 3
+	 i10 <= i27;
+	 i23 <= i27;
+	 i27 <= i_ctrl[2] ? i7 : i_ctrl[1] ? signbit : i20;
+	 i7  <= signbit;
+	 i20 <= i15;
+	 i15 <= i19;
+	 i19 <= i_ctrl[3] ? signbit : i23;
+
+	 //Bit lane 2
+	 i22 <= i26;
+	 i9  <= i26;
+	 i26 <= i30;
+	 i30 <= (i_ctrl[1] | i_ctrl[2]) ? signbit : i14;
+	 i14 <= i18;
+	 i18 <= i_ctrl[3] ? signbit : i22;
+
+	 //Bit lane 1
+	 i21 <= i25;
+	 i8  <= i25;
+	 i25 <= i29;
+	 i29 <= (i_ctrl[1] | i_ctrl[2]) ? signbit : i13;
+	 i13 <= i17;
+	 i17 <= i_ctrl[3] ? signbit : i21;
+
+	 //Bit lane 0
+	 i7_2  <= i11;
+	 i11   <= i28;
+	 i20_2   <= i24;
+	 i24   <= i28;
+	 i28   <= (i_ctrl[1] | i_ctrl[2]) ? signbit : i12;
+	 i12   <= i16;
+	 i16   <= i_ctrl[3] ? signbit : i20_2;
+
       end
    end
+
+   assign o_imm[3] = (i_cnt_done ? signbit : (i_ctrl[0] ? i10 : i23));
+   assign o_imm[2] = i_ctrl[0] ? i9 : i22;
+   assign o_imm[1] = i_ctrl[0] ? i8 : i21;
+   assign o_imm[0] = i_ctrl[0] ? i7_2 : i20_2;
+
+   end
+endgenerate
+
 endmodule
 `default_nettype none
 module serv_decode
@@ -743,441 +1871,6 @@ module serv_decode
       end
    endgenerate
 
-endmodule
-// SPDX-License-Identifier: ISC
-`default_nettype none
-module serv_immdec
-  #(parameter SHARED_RFADDR_IMM_REGS = 1,
-    parameter W = 1)
-  (
-   input wire 	     i_clk,
-   //State
-   input wire 	     i_cnt_en,
-   input wire 	     i_cnt_done,
-   //Control
-   input wire [3:0]  i_immdec_en,
-   input wire 	     i_csr_imm_en,
-   input wire [3:0]  i_ctrl,
-   output wire [4:0] o_rd_addr,
-   output wire [4:0] o_rs1_addr,
-   output wire [4:0] o_rs2_addr,
-   //Data
-   output wire [W-1:0] o_csr_imm,
-   output wire [W-1:0] o_imm,
-   //External
-   input wire 	     i_wb_en,
-   input wire [31:7] i_wb_rdt);
-
-generate
-   if (W == 1) begin : gen_immdec_w_eq_1
-   reg 		     imm31;
-
-   reg [8:0]  imm19_12_20;
-   reg 	      imm7;
-   reg [5:0]  imm30_25;
-   reg [4:0]  imm24_20;
-   reg [4:0]  imm11_7;
-
-   assign o_csr_imm = imm19_12_20[4];
-
-   wire       signbit = imm31 & !i_csr_imm_en;
-
-      if (SHARED_RFADDR_IMM_REGS) begin : gen_shared_imm_regs
-	 assign o_rs1_addr = imm19_12_20[8:4];
-	 assign o_rs2_addr = imm24_20;
-	 assign o_rd_addr  = imm11_7;
-
-	 always @(posedge i_clk) begin
-	    if (i_wb_en) begin
-	       /* CSR immediates are always zero-extended, hence clear the signbit */
-	       imm31     <= i_wb_rdt[31];
-	    end
-	    if (i_wb_en | (i_cnt_en & i_immdec_en[1]))
-	      imm19_12_20 <= i_wb_en ? {i_wb_rdt[19:12],i_wb_rdt[20]} : {i_ctrl[3] ? signbit : imm24_20[0], imm19_12_20[8:1]};
-	    if (i_wb_en | (i_cnt_en))
-	      imm7        <= i_wb_en ? i_wb_rdt[7]                    : signbit;
-
-	    if (i_wb_en | (i_cnt_en & i_immdec_en[3]))
-	      imm30_25    <= i_wb_en ? i_wb_rdt[30:25] : {i_ctrl[2] ? imm7 : i_ctrl[1] ? signbit : imm19_12_20[0], imm30_25[5:1]};
-
-	    if (i_wb_en | (i_cnt_en & i_immdec_en[2]))
-	      imm24_20    <= i_wb_en ? i_wb_rdt[24:20] : {imm30_25[0], imm24_20[4:1]};
-
-	    if (i_wb_en | (i_cnt_en & i_immdec_en[0]))
-	      imm11_7     <= i_wb_en ? i_wb_rdt[11:7] : {imm30_25[0], imm11_7[4:1]};
-	 end
-      end else begin : gen_separate_imm_regs
-	 reg [4:0]  rd_addr;
-	 reg [4:0]  rs1_addr;
-	 reg [4:0]  rs2_addr;
-
-	 assign o_rd_addr  = rd_addr;
-	 assign o_rs1_addr = rs1_addr;
-	 assign o_rs2_addr = rs2_addr;
-	 always @(posedge i_clk) begin
-	    if (i_wb_en) begin
-	       /* CSR immediates are always zero-extended, hence clear the signbit */
-	       imm31       <= i_wb_rdt[31];
-	       imm19_12_20 <= {i_wb_rdt[19:12],i_wb_rdt[20]};
-	       imm7        <= i_wb_rdt[7];
-	       imm30_25    <= i_wb_rdt[30:25];
-	       imm24_20    <= i_wb_rdt[24:20];
-	       imm11_7     <= i_wb_rdt[11:7];
-
-               rd_addr  <= i_wb_rdt[11:7];
-               rs1_addr <= i_wb_rdt[19:15];
-               rs2_addr <= i_wb_rdt[24:20];
-	    end
-	    if (i_cnt_en) begin
-	       imm19_12_20 <= {i_ctrl[3] ? signbit : imm24_20[0], imm19_12_20[8:1]};
-	       imm7        <= signbit;
-	       imm30_25    <= {i_ctrl[2] ? imm7 : i_ctrl[1] ? signbit : imm19_12_20[0], imm30_25[5:1]};
-	       imm24_20    <= {imm30_25[0], imm24_20[4:1]};
-	       imm11_7     <= {imm30_25[0], imm11_7[4:1]};
-	    end
-	 end
-      end
-
-	 assign o_imm = i_cnt_done ? signbit : i_ctrl[0] ? imm11_7[0] : imm24_20[0];
-   end else begin : gen_immdec_w_eq_4
-   reg [4:0]	     rd_addr;
-   reg [4:0]	     rs1_addr;
-   reg [4:0]	     rs2_addr;
-
-   reg		     i31;
-   reg		     i30;
-   reg		     i29;
-   reg		     i28;
-   reg		     i27;
-   reg		     i26;
-   reg		     i25;
-   reg		     i24;
-   reg		     i23;
-   reg		     i22;
-   reg		     i21;
-   reg		     i20;
-   reg		     i19;
-   reg		     i18;
-   reg		     i17;
-   reg		     i16;
-   reg		     i15;
-   reg		     i14;
-   reg		     i13;
-   reg		     i12;
-   reg		     i11;
-   reg		     i10;
-   reg		     i9;
-   reg		     i8;
-   reg		     i7;
-
-   reg		     i7_2;
-   reg		     i20_2;
-
-   wire		     signbit = i31 & !i_csr_imm_en;
-
-   assign o_csr_imm[3] = i18;
-   assign o_csr_imm[2] = i17;
-   assign o_csr_imm[1] = i16;
-   assign o_csr_imm[0] = i15;
-
-   assign o_rd_addr  = rd_addr;
-   assign o_rs1_addr = rs1_addr;
-   assign o_rs2_addr = rs2_addr;
-   always @(posedge i_clk) begin
-      if (i_wb_en) begin
-	 //Common
-	 i31 <= i_wb_rdt[31];
-
-	 //Bit lane 3
-	 i19 <= i_wb_rdt[19];
-	 i15 <= i_wb_rdt[15];
-	 i20 <= i_wb_rdt[20];
-	 i7  <= i_wb_rdt[7];
-	 i27 <= i_wb_rdt[27];
-	 i23 <= i_wb_rdt[23];
-	 i10 <= i_wb_rdt[10];
-
-	 //Bit lane 2
-	 i22 <= i_wb_rdt[22];
-	 i9  <= i_wb_rdt[ 9];
-	 i26 <= i_wb_rdt[26];
-	 i30 <= i_wb_rdt[30];
-	 i14 <= i_wb_rdt[14];
-	 i18 <= i_wb_rdt[18];
-
-	 //Bit lane 1
-	 i21 <= i_wb_rdt[21];
-	 i8  <= i_wb_rdt[ 8];
-	 i25 <= i_wb_rdt[25];
-	 i29 <= i_wb_rdt[29];
-	 i13 <= i_wb_rdt[13];
-	 i17 <= i_wb_rdt[17];
-
-	 //Bit lane 0
-	 i11 <= i_wb_rdt[11];
-	 i7_2  <= i_wb_rdt[7 ];
-	 i20_2   <= i_wb_rdt[20];
-	 i24   <= i_wb_rdt[24];
-	 i28   <= i_wb_rdt[28];
-	 i12   <= i_wb_rdt[12];
-	 i16   <= i_wb_rdt[16];
-
-         rd_addr  <= i_wb_rdt[11:7];
-         rs1_addr <= i_wb_rdt[19:15];
-         rs2_addr <= i_wb_rdt[24:20];
-      end
-      if (i_cnt_en) begin
-	 //Bit lane 3
-	 i10 <= i27;
-	 i23 <= i27;
-	 i27 <= i_ctrl[2] ? i7 : i_ctrl[1] ? signbit : i20;
-	 i7  <= signbit;
-	 i20 <= i15;
-	 i15 <= i19;
-	 i19 <= i_ctrl[3] ? signbit : i23;
-
-	 //Bit lane 2
-	 i22 <= i26;
-	 i9  <= i26;
-	 i26 <= i30;
-	 i30 <= (i_ctrl[1] | i_ctrl[2]) ? signbit : i14;
-	 i14 <= i18;
-	 i18 <= i_ctrl[3] ? signbit : i22;
-
-	 //Bit lane 1
-	 i21 <= i25;
-	 i8  <= i25;
-	 i25 <= i29;
-	 i29 <= (i_ctrl[1] | i_ctrl[2]) ? signbit : i13;
-	 i13 <= i17;
-	 i17 <= i_ctrl[3] ? signbit : i21;
-
-	 //Bit lane 0
-	 i7_2  <= i11;
-	 i11   <= i28;
-	 i20_2   <= i24;
-	 i24   <= i28;
-	 i28   <= (i_ctrl[1] | i_ctrl[2]) ? signbit : i12;
-	 i12   <= i16;
-	 i16   <= i_ctrl[3] ? signbit : i20_2;
-
-      end
-   end
-
-   assign o_imm[3] = (i_cnt_done ? signbit : (i_ctrl[0] ? i10 : i23));
-   assign o_imm[2] = i_ctrl[0] ? i9 : i22;
-   assign o_imm[1] = i_ctrl[0] ? i8 : i21;
-   assign o_imm[0] = i_ctrl[0] ? i7_2 : i20_2;
-
-   end
-endgenerate
-
-endmodule
-`default_nettype none
-module serv_mem_if
-  #(
-    parameter [0:0] WITH_CSR = 1,
-    parameter	    W = 1,
-    parameter	    B = W-1
-  )
-  (
-   input wire 	     i_clk,
-   //State
-   input wire [1:0]  i_bytecnt,
-   input wire [1:0]  i_lsb,
-   output wire 	     o_misalign,
-   //Control
-   input wire 	     i_signed,
-   input wire 	     i_word,
-   input wire 	     i_half,
-   //MDU
-   input wire 	     i_mdu_op,
-   //Data
-   input wire [B:0] i_bufreg2_q,
-   output wire [B:0] o_rd,
-   //External interface
-   output wire [3:0] o_wb_sel);
-
-   reg signbit;
-
-   wire dat_valid =
-	i_mdu_op |
-	i_word |
-	(i_bytecnt == 2'b00) |
-	(i_half & !i_bytecnt[1]);
-
-   assign o_rd = dat_valid ? i_bufreg2_q : {W{i_signed & signbit}};
-
-   assign o_wb_sel[3] = (i_lsb == 2'b11) | i_word | (i_half & i_lsb[1]);
-   assign o_wb_sel[2] = (i_lsb == 2'b10) | i_word;
-   assign o_wb_sel[1] = (i_lsb == 2'b01) | i_word | (i_half & !i_lsb[1]);
-   assign o_wb_sel[0] = (i_lsb == 2'b00);
-
-   always @(posedge i_clk) begin
-      if (dat_valid)
-        signbit <= i_bufreg2_q[B];
-   end
-
-   /*
-    mem_misalign is checked after the init stage to decide whether to do a data
-    bus transaction or go to the trap state. It is only guaranteed to be correct
-    at this time
-    */
-   assign o_misalign = WITH_CSR & ((i_lsb[0] & (i_word | i_half)) | (i_lsb[1] & i_word));
-
-endmodule
-`default_nettype none
-module serv_rf_if
-  #(parameter WITH_CSR = 1,
-    parameter W = 1,
-    parameter B = W-1
-  )
-  (//RF Interface
-   input wire 		      i_cnt_en,
-   output wire [4+WITH_CSR:0] o_wreg0,
-   output wire [4+WITH_CSR:0] o_wreg1,
-   output wire 		      o_wen0,
-   output wire 		      o_wen1,
-   output wire [B:0]  o_wdata0,
-   output wire [B:0]  o_wdata1,
-   output wire [4+WITH_CSR:0] o_rreg0,
-   output wire [4+WITH_CSR:0] o_rreg1,
-   input wire  [B:0] i_rdata0,
-   input wire  [B:0] i_rdata1,
-
-   //Trap interface
-   input wire 		      i_trap,
-   input wire 		      i_mret,
-   input wire [B:0] i_mepc,
-   input wire                      i_mtval_pc,
-   input wire [B:0] i_bufreg_q,
-   input wire [B:0] i_bad_pc,
-   output wire [B:0] o_csr_pc,
-   //CSR interface
-   input wire 		      i_csr_en,
-   input wire [1:0] 	      i_csr_addr,
-   input wire [B:0] i_csr,
-   output wire [B:0] o_csr,
-   //RD write port
-   input wire 		      i_rd_wen,
-   input wire [4:0] 	      i_rd_waddr,
-   input wire [B:0] i_ctrl_rd,
-   input wire [B:0] i_alu_rd,
-   input wire 		      i_rd_alu_en,
-   input wire [B:0] i_csr_rd,
-   input wire 		      i_rd_csr_en,
-   input wire [B:0] i_mem_rd,
-   input wire 		      i_rd_mem_en,
-
-   //RS1 read port
-   input wire [4:0] 	      i_rs1_raddr,
-   output wire [B:0] o_rs1,
-   //RS2 read port
-   input wire [4:0] 	      i_rs2_raddr,
-   output wire [B:0] o_rs2);
-
-
-   /*
-    ********** Write side ***********
-    */
-
-   wire 	     rd_wen = i_rd_wen & (|i_rd_waddr);
-
-   generate
-   if (|WITH_CSR) begin : gen_csr
-   wire [B:0] rd =
-       {W{i_rd_alu_en}} & i_alu_rd |
-       {W{i_rd_csr_en}} & i_csr_rd |
-       {W{i_rd_mem_en}} & i_mem_rd |
-                       i_ctrl_rd;
-
-   wire [B:0]  mtval = i_mtval_pc ? i_bad_pc : i_bufreg_q;
-
-   assign 	     o_wdata0 = i_trap ? mtval  : rd;
-   assign	     o_wdata1 = i_trap ? i_mepc : i_csr;
-
-   /* Port 0 handles writes to mtval during traps and rd otherwise
-    * Port 1 handles writes to mepc during traps and csr accesses otherwise
-    *
-    * GPR registers are mapped to address 0-31 (bits 0xxxxx).
-    * Following that are four CSR registers
-    * mscratch 100000
-    * mtvec    100001
-    * mepc     100010
-    * mtval    100011
-    */
-
-   assign o_wreg0 = i_trap ? {6'b100011} : {1'b0,i_rd_waddr};
-   assign o_wreg1 = i_trap ? {6'b100010} : {4'b1000,i_csr_addr};
-
-   assign       o_wen0 = i_cnt_en & (i_trap | rd_wen);
-   assign       o_wen1 = i_cnt_en & (i_trap | i_csr_en);
-
-   /*
-    ********** Read side ***********
-    */
-
-   //0 : RS1
-   //1 : RS2 / CSR
-
-   assign o_rreg0 = {1'b0, i_rs1_raddr};
-
-   /*
-    The address of the second read port (o_rreg1) can get assigned from four
-    different sources
-
-    Normal operations : i_rs2_raddr
-    CSR access        : i_csr_addr
-    trap              : MTVEC
-    mret              : MEPC
-
-    Address 0-31 in the RF are assigned to the GPRs. After that follows the four
-    CSRs on addresses 32-35
-
-    32 MSCRATCH
-    33 MTVEC
-    34 MEPC
-    35 MTVAL
-
-    The expression below is an optimized version of this logic
-    */
-   wire sel_rs2 = !(i_trap | i_mret | i_csr_en);
-   assign o_rreg1 = {~sel_rs2,
-		     i_rs2_raddr[4:2] & {3{sel_rs2}},
-		     {1'b0,i_trap} | {i_mret,1'b0} | ({2{i_csr_en}} & i_csr_addr) | ({2{sel_rs2}} & i_rs2_raddr[1:0])};
-
-   assign o_rs1 = i_rdata0;
-   assign o_rs2 = i_rdata1;
-   assign o_csr = i_rdata1 & {W{i_csr_en}};
-   assign o_csr_pc = i_rdata1;
-
-   end else begin : gen_no_csr
-      wire [B:0] rd = (i_ctrl_rd) |
-          i_alu_rd  & {W{i_rd_alu_en}} |
-          i_mem_rd  & {W{i_rd_mem_en}};
-
-      assign 	     o_wdata0 = rd;
-      assign	     o_wdata1 = {W{1'b0}};
-
-      assign o_wreg0 = i_rd_waddr;
-      assign o_wreg1 = 5'd0;
-
-      assign       o_wen0 = i_cnt_en & rd_wen;
-      assign       o_wen1 = 1'b0;
-
-   /*
-    ********** Read side ***********
-    */
-
-      assign o_rreg0 = i_rs1_raddr;
-      assign o_rreg1 = i_rs2_raddr;
-
-      assign o_rs1 = i_rdata0;
-      assign o_rs2 = i_rdata1;
-      assign o_csr = {W{1'b0}};
-      assign o_csr_pc = {W{1'b0}};
-   end // else: !if(WITH_CSR)
-   endgenerate
 endmodule
 module serv_state
   #(parameter RESET_STRATEGY = "MINI",
@@ -2260,6 +2953,507 @@ module serv_rf_ram_if
 
 
 endmodule
+/*
+ * servile_arbiter.v : I/D arbiter for the servile convenience wrapper.
+ *  Relies on the fact that not ibus and dbus are active at the same time.
+ *
+ * SPDX-FileCopyrightText: 2024 Olof Kindgren <olof.kindgren@gmail.com>
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+module servile_arbiter
+  (
+   input wire [31:0]  i_wb_cpu_dbus_adr,
+   input wire [31:0]  i_wb_cpu_dbus_dat,
+   input wire [3:0]   i_wb_cpu_dbus_sel,
+   input wire 	      i_wb_cpu_dbus_we,
+   input wire 	      i_wb_cpu_dbus_stb,
+   output wire [31:0] o_wb_cpu_dbus_rdt,
+   output wire 	      o_wb_cpu_dbus_ack,
+
+   input wire [31:0]  i_wb_cpu_ibus_adr,
+   input wire 	      i_wb_cpu_ibus_stb,
+   output wire [31:0] o_wb_cpu_ibus_rdt,
+   output wire 	      o_wb_cpu_ibus_ack,
+
+   output wire [31:0] o_wb_mem_adr,
+   output wire [31:0] o_wb_mem_dat,
+   output wire [3:0]  o_wb_mem_sel,
+   output wire 	      o_wb_mem_we,
+   output wire 	      o_wb_mem_stb,
+   input wire [31:0]  i_wb_mem_rdt,
+   input wire 	      i_wb_mem_ack);
+
+   assign o_wb_cpu_dbus_rdt = i_wb_mem_rdt;
+   assign o_wb_cpu_dbus_ack = i_wb_mem_ack & !i_wb_cpu_ibus_stb;
+
+   assign o_wb_cpu_ibus_rdt = i_wb_mem_rdt;
+   assign o_wb_cpu_ibus_ack = i_wb_mem_ack & i_wb_cpu_ibus_stb;
+
+   assign o_wb_mem_adr = i_wb_cpu_ibus_stb ? i_wb_cpu_ibus_adr : i_wb_cpu_dbus_adr;
+   assign o_wb_mem_dat = i_wb_cpu_dbus_dat;
+   assign o_wb_mem_sel = i_wb_cpu_dbus_sel;
+   assign o_wb_mem_we  = i_wb_cpu_dbus_we & !i_wb_cpu_ibus_stb;
+   assign o_wb_mem_stb = i_wb_cpu_ibus_stb | i_wb_cpu_dbus_stb;
+
+
+endmodule
+/*
+ * servile_mux.v : Simple Wishbone mux for the servile convenience wrapper.
+ *
+ * SPDX-FileCopyrightText: 2024 Olof Kindgren <olof.kindgren@gmail.com>
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+module servile_mux
+  #(parameter [0:0]  sim = 1'b0, //Enable simulation features
+    parameter [31:0] sim_sig_adr = 32'h80000000,
+    parameter [31:0] sim_halt_adr = 32'h90000000)
+   (
+    input wire	       i_clk,
+    input wire	       i_rst,
+
+    input wire [31:0]  i_wb_cpu_adr,
+    input wire [31:0]  i_wb_cpu_dat,
+    input wire [3:0]   i_wb_cpu_sel,
+    input wire	       i_wb_cpu_we,
+    input wire	       i_wb_cpu_stb,
+    output wire [31:0] o_wb_cpu_rdt,
+    output wire	       o_wb_cpu_ack,
+
+    output wire [31:0] o_wb_mem_adr,
+    output wire [31:0] o_wb_mem_dat,
+    output wire [3:0]  o_wb_mem_sel,
+    output wire	       o_wb_mem_we,
+    output wire	       o_wb_mem_stb,
+    input wire [31:0]  i_wb_mem_rdt,
+    input wire	       i_wb_mem_ack,
+
+    output wire [31:0] o_wb_ext_adr,
+    output wire [31:0] o_wb_ext_dat,
+    output wire [3:0]  o_wb_ext_sel,
+    output wire	       o_wb_ext_we,
+    output wire	       o_wb_ext_stb,
+    input wire [31:0]  i_wb_ext_rdt,
+    input wire	       i_wb_ext_ack);
+
+   wire		       sig_en;
+   wire		       halt_en;
+   reg		       sim_ack;
+
+   wire		       ext = (i_wb_cpu_adr[31:30] != 2'b00);
+   //wire ext = (i_wb_cpu_adr[31:28] != 4'h8);
+   assign o_wb_cpu_rdt = ext ? i_wb_ext_rdt : i_wb_mem_rdt;
+   assign o_wb_cpu_ack = i_wb_ext_ack | i_wb_mem_ack | sim_ack;
+
+   assign o_wb_mem_adr = i_wb_cpu_adr;
+   assign o_wb_mem_dat = i_wb_cpu_dat;
+   assign o_wb_mem_sel = i_wb_cpu_sel;
+   assign o_wb_mem_we  = i_wb_cpu_we;
+   assign o_wb_mem_stb = i_wb_cpu_stb & !ext & !(sig_en|halt_en);
+
+   assign o_wb_ext_adr = i_wb_cpu_adr;
+   assign o_wb_ext_dat = i_wb_cpu_dat;
+   assign o_wb_ext_sel = i_wb_cpu_sel;
+   assign o_wb_ext_we  = i_wb_cpu_we;
+   assign o_wb_ext_stb = i_wb_cpu_stb & ext & !(sig_en|halt_en);
+
+   generate
+      if (sim) begin
+
+	 integer      f = 0;
+
+	 assign sig_en  = |f & i_wb_cpu_we & (i_wb_cpu_adr == sim_sig_adr);
+	 assign halt_en = i_wb_cpu_we & (i_wb_cpu_adr == sim_halt_adr);
+
+	 reg [1023:0] signature_file;
+
+	 initial
+	   /* verilator lint_off WIDTH */
+	   if ($value$plusargs("signature=%s", signature_file)) begin
+	      $display("Writing signature to %0s", signature_file);
+	      f = $fopen(signature_file, "w");
+	   end
+	 /* verilator lint_on WIDTH */
+
+	 always @(posedge i_clk) begin
+	    sim_ack <= 1'b0;
+	    if (i_wb_cpu_stb & !sim_ack) begin
+	       sim_ack <= sig_en|halt_en;
+	       if (sig_en & (f != 0))
+		 $fwrite(f, "%c", i_wb_cpu_dat[7:0]);
+	       else if(halt_en) begin
+		  $display("Test complete");
+		  $finish;
+	       end
+	    end
+	    if (i_rst)
+	      sim_ack <= 1'b0;
+	 end
+      end else begin
+	 assign sig_en = 1'b0;
+	 assign halt_en = 1'b0;
+	 initial sim_ack = 1'b0;
+      end
+   endgenerate
+
+endmodule
+/*
+ * servile.v : Top-level for Servile, the SERV convenience wrapper
+ *
+ * SPDX-FileCopyrightText: 2024 Olof Kindgren <olof.kindgren@gmail.com>
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+`default_nettype none
+module servile
+  #(
+    parameter	    width = 1,
+    parameter	    reset_pc = 32'h00000000,
+    parameter	    reset_strategy = "MINI",
+    parameter	    rf_width = 2*width,
+    parameter [0:0] sim = 1'b0,
+    parameter [0:0] debug = 1'b0,
+    parameter [0:0] with_c = 1'b0,
+    parameter [0:0] with_csr = 1'b0,
+    parameter [0:0] with_mdu = 1'b0,
+    //Internally calculated. Do not touch
+    parameter	    B = width-1,
+    parameter	    regs = 32+with_csr*4,
+    parameter	    rf_l2d = $clog2(regs*32/rf_width))
+  (
+   input wire		      i_clk,
+   input wire		      i_rst,
+   input wire		      i_timer_irq,
+
+   //Memory (WB) interface
+   output wire [31:0]	      o_wb_mem_adr,
+   output wire [31:0]	      o_wb_mem_dat,
+   output wire [3:0]	      o_wb_mem_sel,
+   output wire		      o_wb_mem_we ,
+   output wire		      o_wb_mem_stb,
+   input wire [31:0]	      i_wb_mem_rdt,
+   input wire		      i_wb_mem_ack,
+
+   //Extension (WB) interface
+   output wire [31:0]	      o_wb_ext_adr,
+   output wire [31:0]	      o_wb_ext_dat,
+   output wire [3:0]	      o_wb_ext_sel,
+   output wire		      o_wb_ext_we ,
+   output wire		      o_wb_ext_stb,
+   input wire [31:0]	      i_wb_ext_rdt,
+   input wire		      i_wb_ext_ack,
+
+   //RF (SRAM) interface
+   output wire [rf_l2d-1:0]   o_rf_waddr,
+   output wire [rf_width-1:0] o_rf_wdata,
+   output wire		      o_rf_wen,
+   output wire [rf_l2d-1:0]   o_rf_raddr,
+   input wire [rf_width-1:0]  i_rf_rdata,
+   output wire		      o_rf_ren);
+
+
+
+   wire [31:0] 	wb_ibus_adr;
+   wire 	wb_ibus_stb;
+   wire [31:0] 	wb_ibus_rdt;
+   wire 	wb_ibus_ack;
+
+   wire [31:0] 	wb_dbus_adr;
+   wire [31:0] 	wb_dbus_dat;
+   wire [3:0] 	wb_dbus_sel;
+   wire 	wb_dbus_we;
+   wire 	wb_dbus_stb;
+   wire [31:0] 	wb_dbus_rdt;
+   wire 	wb_dbus_ack;
+
+   wire [31:0] 	wb_dmem_adr;
+   wire [31:0] 	wb_dmem_dat;
+   wire [3:0] 	wb_dmem_sel;
+   wire 	wb_dmem_we;
+   wire 	wb_dmem_stb;
+   wire [31:0] 	wb_dmem_rdt;
+   wire 	wb_dmem_ack;
+
+   wire 		   rf_wreq;
+   wire 		   rf_rreq;
+   wire [$clog2(regs)-1:0] wreg0;
+   wire [$clog2(regs)-1:0] wreg1;
+   wire 		   wen0;
+   wire 		   wen1;
+   wire [B:0]		   wdata0;
+   wire [B:0]		   wdata1;
+   wire [$clog2(regs)-1:0] rreg0;
+   wire [$clog2(regs)-1:0] rreg1;
+   wire 		   rf_ready;
+   wire [B:0]		   rdata0;
+   wire [B:0]		   rdata1;
+
+   wire [31:0]		   mdu_rs1;
+   wire [31:0]		   mdu_rs2;
+   wire [ 2:0]		   mdu_op;
+   wire			   mdu_valid;
+   wire [31:0]		   mdu_rd;
+   wire			   mdu_ready;
+
+   servile_mux
+     #(.sim (sim))
+   mux
+     (.i_clk        (i_clk),
+      .i_rst        (i_rst & (reset_strategy != "NONE")),
+
+      .i_wb_cpu_adr (wb_dbus_adr),
+      .i_wb_cpu_dat (wb_dbus_dat),
+      .i_wb_cpu_sel (wb_dbus_sel),
+      .i_wb_cpu_we  (wb_dbus_we),
+      .i_wb_cpu_stb (wb_dbus_stb),
+      .o_wb_cpu_rdt (wb_dbus_rdt),
+      .o_wb_cpu_ack (wb_dbus_ack),
+
+      .o_wb_mem_adr (wb_dmem_adr),
+      .o_wb_mem_dat (wb_dmem_dat),
+      .o_wb_mem_sel (wb_dmem_sel),
+      .o_wb_mem_we  (wb_dmem_we),
+      .o_wb_mem_stb (wb_dmem_stb),
+      .i_wb_mem_rdt (wb_dmem_rdt),
+      .i_wb_mem_ack (wb_dmem_ack),
+
+      .o_wb_ext_adr (o_wb_ext_adr),
+      .o_wb_ext_dat (o_wb_ext_dat),
+      .o_wb_ext_sel (o_wb_ext_sel),
+      .o_wb_ext_we  (o_wb_ext_we),
+      .o_wb_ext_stb (o_wb_ext_stb),
+      .i_wb_ext_rdt (i_wb_ext_rdt),
+      .i_wb_ext_ack (i_wb_ext_ack));
+
+   servile_arbiter arbiter
+     (.i_wb_cpu_dbus_adr (wb_dmem_adr),
+      .i_wb_cpu_dbus_dat (wb_dmem_dat),
+      .i_wb_cpu_dbus_sel (wb_dmem_sel),
+      .i_wb_cpu_dbus_we  (wb_dmem_we ),
+      .i_wb_cpu_dbus_stb (wb_dmem_stb),
+      .o_wb_cpu_dbus_rdt (wb_dmem_rdt),
+      .o_wb_cpu_dbus_ack (wb_dmem_ack),
+
+      .i_wb_cpu_ibus_adr (wb_ibus_adr),
+      .i_wb_cpu_ibus_stb (wb_ibus_stb),
+      .o_wb_cpu_ibus_rdt (wb_ibus_rdt),
+      .o_wb_cpu_ibus_ack (wb_ibus_ack),
+
+      .o_wb_mem_adr (o_wb_mem_adr),
+      .o_wb_mem_dat (o_wb_mem_dat),
+      .o_wb_mem_sel (o_wb_mem_sel),
+      .o_wb_mem_we  (o_wb_mem_we ),
+      .o_wb_mem_stb (o_wb_mem_stb),
+      .i_wb_mem_rdt (i_wb_mem_rdt),
+      .i_wb_mem_ack (i_wb_mem_ack));
+
+
+
+   serv_rf_ram_if
+     #(.width    (rf_width),
+       .W        (width),
+       .reset_strategy (reset_strategy),
+       .csr_regs (with_csr*4))
+   rf_ram_if
+     (.i_clk    (i_clk),
+      .i_rst    (i_rst),
+      //RF IF
+      .i_wreq   (rf_wreq),
+      .i_rreq   (rf_rreq),
+      .o_ready  (rf_ready),
+      .i_wreg0  (wreg0),
+      .i_wreg1  (wreg1),
+      .i_wen0   (wen0),
+      .i_wen1   (wen1),
+      .i_wdata0 (wdata0),
+      .i_wdata1 (wdata1),
+      .i_rreg0  (rreg0),
+      .i_rreg1  (rreg1),
+      .o_rdata0 (rdata0),
+      .o_rdata1 (rdata1),
+      //SRAM IF
+      .o_waddr  (o_rf_waddr),
+      .o_wdata  (o_rf_wdata),
+      .o_wen    (o_rf_wen),
+      .o_raddr  (o_rf_raddr),
+      .o_ren    (o_rf_ren),
+      .i_rdata  (i_rf_rdata));
+
+   generate
+      if (with_mdu) begin : gen_mdu
+	 mdu_top mdu_serv
+	   (.i_clk       (i_clk),
+	    .i_rst       (i_rst),
+	    .i_mdu_rs1   (mdu_rs1),
+	    .i_mdu_rs2   (mdu_rs2),
+	    .i_mdu_op    (mdu_op),
+	    .i_mdu_valid (mdu_valid),
+	    .o_mdu_ready (mdu_ready),
+	    .o_mdu_rd    (mdu_rd));
+      end else begin
+	 assign mdu_ready = 1'b0;
+	 assign mdu_rd = 32'd0;
+      end
+   endgenerate
+
+   serv_top
+     #(
+       .WITH_CSR       (with_csr?1:0),
+       .W              (width),
+       .PRE_REGISTER   (1'b1),
+       .RESET_STRATEGY (reset_strategy),
+       .RESET_PC       (reset_pc),
+       .DEBUG          (debug),
+       .MDU            (with_mdu),
+       .COMPRESSED     (with_c))
+   cpu
+     (
+      .clk         (i_clk),
+      .i_rst       (i_rst),
+      .i_timer_irq (i_timer_irq),
+
+`ifdef RISCV_FORMAL
+      .rvfi_valid     (),
+      .rvfi_order     (),
+      .rvfi_insn      (),
+      .rvfi_trap      (),
+      .rvfi_halt      (),
+      .rvfi_intr      (),
+      .rvfi_mode      (),
+      .rvfi_ixl       (),
+      .rvfi_rs1_addr  (),
+      .rvfi_rs2_addr  (),
+      .rvfi_rs1_rdata (),
+      .rvfi_rs2_rdata (),
+      .rvfi_rd_addr   (),
+      .rvfi_rd_wdata  (),
+      .rvfi_pc_rdata  (),
+      .rvfi_pc_wdata  (),
+      .rvfi_mem_addr  (),
+      .rvfi_mem_rmask (),
+      .rvfi_mem_wmask (),
+      .rvfi_mem_rdata (),
+      .rvfi_mem_wdata (),
+`endif
+      //RF IF
+      .o_rf_rreq   (rf_rreq),
+      .o_rf_wreq   (rf_wreq),
+      .i_rf_ready  (rf_ready),
+      .o_wreg0     (wreg0),
+      .o_wreg1     (wreg1),
+      .o_wen0      (wen0),
+      .o_wen1      (wen1),
+      .o_wdata0    (wdata0),
+      .o_wdata1    (wdata1),
+      .o_rreg0     (rreg0),
+      .o_rreg1     (rreg1),
+      .i_rdata0    (rdata0),
+      .i_rdata1    (rdata1),
+
+      //Instruction bus
+      .o_ibus_adr  (wb_ibus_adr),
+      .o_ibus_cyc  (wb_ibus_stb),
+      .i_ibus_rdt  (wb_ibus_rdt),
+      .i_ibus_ack  (wb_ibus_ack),
+
+      //Data bus
+      .o_dbus_adr  (wb_dbus_adr),
+      .o_dbus_dat  (wb_dbus_dat),
+      .o_dbus_sel  (wb_dbus_sel),
+      .o_dbus_we   (wb_dbus_we),
+      .o_dbus_cyc  (wb_dbus_stb),
+      .i_dbus_rdt  (wb_dbus_rdt),
+      .i_dbus_ack  (wb_dbus_ack),
+
+      //Extension IF
+      .o_ext_rs1    (mdu_rs1),
+      .o_ext_rs2    (mdu_rs2),
+      .o_ext_funct3 (mdu_op),
+      .i_ext_rd     (mdu_rd),
+      .i_ext_ready  (mdu_ready),
+      //MDU
+      .o_mdu_valid  (mdu_valid));
+
+endmodule
+`default_nettype wire
+/*
+ * servile_rf_mem_if.v : Arbiter to allow a shared SRAM for RF and memory accesses. RF is mapped to the highest 128 bytes of the memory. Requires 8-bit RF accesses.
+ *
+ * SPDX-FileCopyrightText: 2024 Olof Kindgren <olof.kindgren@gmail.com>
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+`default_nettype none
+module servile_rf_mem_if
+  #(//Memory parameters
+    parameter depth = 256,
+    //RF parameters
+    parameter rf_regs = 32,
+    //Internally calculated. Do not touch
+    parameter rf_depth = $clog2(rf_regs*4),
+    parameter aw = $clog2(depth))
+   (
+    input wire		      i_clk,
+    input wire		      i_rst,
+    input wire [rf_depth-1:0] i_waddr,
+    input wire [7:0]	      i_wdata,
+    input wire		      i_wen,
+    input wire [rf_depth-1:0] i_raddr,
+    output wire [7:0]	      o_rdata,
+    input wire		      i_ren,
+
+    output wire [aw-1:0]      o_sram_waddr,
+    output wire [7:0]	      o_sram_wdata,
+    output wire		      o_sram_wen,
+    output wire [aw-1:0]      o_sram_raddr,
+    input wire [7:0]	      i_sram_rdata,
+    output wire		      o_sram_ren,
+
+    input wire [aw-1:2]	      i_wb_adr,
+    input wire [31:0]	      i_wb_dat,
+    input wire [3:0]	      i_wb_sel,
+    input wire		      i_wb_we,
+    input wire		      i_wb_stb,
+    output wire [31:0]	      o_wb_rdt,
+    output reg		      o_wb_ack);
+
+   reg [1:0] 		bsel;
+
+   wire 		wb_en = i_wb_stb & !i_wen & !o_wb_ack;
+
+   wire 		wb_we = i_wb_we & i_wb_sel[bsel];
+
+   wire [aw-1:0] rf_waddr = ~{{aw-rf_depth{1'b0}},i_waddr};
+   wire [aw-1:0] rf_raddr = ~{{aw-rf_depth{1'b0}},i_raddr};
+
+   assign o_sram_waddr = wb_en ? {i_wb_adr[aw-1:2],bsel} : rf_waddr;
+   assign o_sram_wdata = wb_en ? i_wb_dat[bsel*8+:8]     : i_wdata;
+   assign o_sram_wen   = wb_en ? wb_we : i_wen;
+   assign o_sram_raddr = wb_en ? {i_wb_adr[aw-1:2],bsel} : rf_raddr;
+   assign o_sram_ren   = wb_en ? !i_wb_we : i_ren;
+
+   reg [23:0] 		wb_rdt;
+   assign o_wb_rdt = {i_sram_rdata, wb_rdt};
+
+   reg 			regzero;
+   always @(posedge i_clk) begin
+
+      if (wb_en) bsel <= bsel + 2'd1;
+      o_wb_ack <= wb_en & &bsel;
+      if (bsel == 2'b01) wb_rdt[7:0]   <= i_sram_rdata;
+      if (bsel == 2'b10) wb_rdt[15:8]  <= i_sram_rdata;
+      if (bsel == 2'b11) wb_rdt[23:16] <= i_sram_rdata;
+      if (i_rst) begin
+	 bsel <= 2'd0;
+	 o_wb_ack <= 1'b0;
+      end
+      regzero <= &i_raddr[rf_depth-1:2];
+   end
+
+   assign o_rdata = regzero ? 8'd0 : i_sram_rdata;
+
+endmodule
 /* serving_ram.v : I/D SRAM for the serving SoC
  *
  * ISC License
@@ -2682,803 +3876,6 @@ module serving
    
    
    endmodule
-/*
- * servile_rf_mem_if.v : Arbiter to allow a shared SRAM for RF and memory accesses. RF is mapped to the highest 128 bytes of the memory. Requires 8-bit RF accesses.
- *
- * SPDX-FileCopyrightText: 2024 Olof Kindgren <olof.kindgren@gmail.com>
- * SPDX-License-Identifier: Apache-2.0
- */
-
-`default_nettype none
-module servile_rf_mem_if
-  #(//Memory parameters
-    parameter depth = 256,
-    //RF parameters
-    parameter rf_regs = 32,
-    //Internally calculated. Do not touch
-    parameter rf_depth = $clog2(rf_regs*4),
-    parameter aw = $clog2(depth))
-   (
-    input wire		      i_clk,
-    input wire		      i_rst,
-    input wire [rf_depth-1:0] i_waddr,
-    input wire [7:0]	      i_wdata,
-    input wire		      i_wen,
-    input wire [rf_depth-1:0] i_raddr,
-    output wire [7:0]	      o_rdata,
-    input wire		      i_ren,
-
-    output wire [aw-1:0]      o_sram_waddr,
-    output wire [7:0]	      o_sram_wdata,
-    output wire		      o_sram_wen,
-    output wire [aw-1:0]      o_sram_raddr,
-    input wire [7:0]	      i_sram_rdata,
-    output wire		      o_sram_ren,
-
-    input wire [aw-1:2]	      i_wb_adr,
-    input wire [31:0]	      i_wb_dat,
-    input wire [3:0]	      i_wb_sel,
-    input wire		      i_wb_we,
-    input wire		      i_wb_stb,
-    output wire [31:0]	      o_wb_rdt,
-    output reg		      o_wb_ack);
-
-   reg [1:0] 		bsel;
-
-   wire 		wb_en = i_wb_stb & !i_wen & !o_wb_ack;
-
-   wire 		wb_we = i_wb_we & i_wb_sel[bsel];
-
-   wire [aw-1:0] rf_waddr = ~{{aw-rf_depth{1'b0}},i_waddr};
-   wire [aw-1:0] rf_raddr = ~{{aw-rf_depth{1'b0}},i_raddr};
-
-   assign o_sram_waddr = wb_en ? {i_wb_adr[aw-1:2],bsel} : rf_waddr;
-   assign o_sram_wdata = wb_en ? i_wb_dat[bsel*8+:8]     : i_wdata;
-   assign o_sram_wen   = wb_en ? wb_we : i_wen;
-   assign o_sram_raddr = wb_en ? {i_wb_adr[aw-1:2],bsel} : rf_raddr;
-   assign o_sram_ren   = wb_en ? !i_wb_we : i_ren;
-
-   reg [23:0] 		wb_rdt;
-   assign o_wb_rdt = {i_sram_rdata, wb_rdt};
-
-   reg 			regzero;
-   always @(posedge i_clk) begin
-
-      if (wb_en) bsel <= bsel + 2'd1;
-      o_wb_ack <= wb_en & &bsel;
-      if (bsel == 2'b01) wb_rdt[7:0]   <= i_sram_rdata;
-      if (bsel == 2'b10) wb_rdt[15:8]  <= i_sram_rdata;
-      if (bsel == 2'b11) wb_rdt[23:16] <= i_sram_rdata;
-      if (i_rst) begin
-	 bsel <= 2'd0;
-	 o_wb_ack <= 1'b0;
-      end
-      regzero <= &i_raddr[rf_depth-1:2];
-   end
-
-   assign o_rdata = regzero ? 8'd0 : i_sram_rdata;
-
-endmodule
-/*
- * servile.v : Top-level for Servile, the SERV convenience wrapper
- *
- * SPDX-FileCopyrightText: 2024 Olof Kindgren <olof.kindgren@gmail.com>
- * SPDX-License-Identifier: Apache-2.0
- */
-
-`default_nettype none
-module servile
-  #(
-    parameter	    width = 1,
-    parameter	    reset_pc = 32'h00000000,
-    parameter	    reset_strategy = "MINI",
-    parameter	    rf_width = 2*width,
-    parameter [0:0] sim = 1'b0,
-    parameter [0:0] debug = 1'b0,
-    parameter [0:0] with_c = 1'b0,
-    parameter [0:0] with_csr = 1'b0,
-    parameter [0:0] with_mdu = 1'b0,
-    //Internally calculated. Do not touch
-    parameter	    B = width-1,
-    parameter	    regs = 32+with_csr*4,
-    parameter	    rf_l2d = $clog2(regs*32/rf_width))
-  (
-   input wire		      i_clk,
-   input wire		      i_rst,
-   input wire		      i_timer_irq,
-
-   //Memory (WB) interface
-   output wire [31:0]	      o_wb_mem_adr,
-   output wire [31:0]	      o_wb_mem_dat,
-   output wire [3:0]	      o_wb_mem_sel,
-   output wire		      o_wb_mem_we ,
-   output wire		      o_wb_mem_stb,
-   input wire [31:0]	      i_wb_mem_rdt,
-   input wire		      i_wb_mem_ack,
-
-   //Extension (WB) interface
-   output wire [31:0]	      o_wb_ext_adr,
-   output wire [31:0]	      o_wb_ext_dat,
-   output wire [3:0]	      o_wb_ext_sel,
-   output wire		      o_wb_ext_we ,
-   output wire		      o_wb_ext_stb,
-   input wire [31:0]	      i_wb_ext_rdt,
-   input wire		      i_wb_ext_ack,
-
-   //RF (SRAM) interface
-   output wire [rf_l2d-1:0]   o_rf_waddr,
-   output wire [rf_width-1:0] o_rf_wdata,
-   output wire		      o_rf_wen,
-   output wire [rf_l2d-1:0]   o_rf_raddr,
-   input wire [rf_width-1:0]  i_rf_rdata,
-   output wire		      o_rf_ren);
-
-
-
-   wire [31:0] 	wb_ibus_adr;
-   wire 	wb_ibus_stb;
-   wire [31:0] 	wb_ibus_rdt;
-   wire 	wb_ibus_ack;
-
-   wire [31:0] 	wb_dbus_adr;
-   wire [31:0] 	wb_dbus_dat;
-   wire [3:0] 	wb_dbus_sel;
-   wire 	wb_dbus_we;
-   wire 	wb_dbus_stb;
-   wire [31:0] 	wb_dbus_rdt;
-   wire 	wb_dbus_ack;
-
-   wire [31:0] 	wb_dmem_adr;
-   wire [31:0] 	wb_dmem_dat;
-   wire [3:0] 	wb_dmem_sel;
-   wire 	wb_dmem_we;
-   wire 	wb_dmem_stb;
-   wire [31:0] 	wb_dmem_rdt;
-   wire 	wb_dmem_ack;
-
-   wire 		   rf_wreq;
-   wire 		   rf_rreq;
-   wire [$clog2(regs)-1:0] wreg0;
-   wire [$clog2(regs)-1:0] wreg1;
-   wire 		   wen0;
-   wire 		   wen1;
-   wire [B:0]		   wdata0;
-   wire [B:0]		   wdata1;
-   wire [$clog2(regs)-1:0] rreg0;
-   wire [$clog2(regs)-1:0] rreg1;
-   wire 		   rf_ready;
-   wire [B:0]		   rdata0;
-   wire [B:0]		   rdata1;
-
-   wire [31:0]		   mdu_rs1;
-   wire [31:0]		   mdu_rs2;
-   wire [ 2:0]		   mdu_op;
-   wire			   mdu_valid;
-   wire [31:0]		   mdu_rd;
-   wire			   mdu_ready;
-
-   servile_mux
-     #(.sim (sim))
-   mux
-     (.i_clk        (i_clk),
-      .i_rst        (i_rst & (reset_strategy != "NONE")),
-
-      .i_wb_cpu_adr (wb_dbus_adr),
-      .i_wb_cpu_dat (wb_dbus_dat),
-      .i_wb_cpu_sel (wb_dbus_sel),
-      .i_wb_cpu_we  (wb_dbus_we),
-      .i_wb_cpu_stb (wb_dbus_stb),
-      .o_wb_cpu_rdt (wb_dbus_rdt),
-      .o_wb_cpu_ack (wb_dbus_ack),
-
-      .o_wb_mem_adr (wb_dmem_adr),
-      .o_wb_mem_dat (wb_dmem_dat),
-      .o_wb_mem_sel (wb_dmem_sel),
-      .o_wb_mem_we  (wb_dmem_we),
-      .o_wb_mem_stb (wb_dmem_stb),
-      .i_wb_mem_rdt (wb_dmem_rdt),
-      .i_wb_mem_ack (wb_dmem_ack),
-
-      .o_wb_ext_adr (o_wb_ext_adr),
-      .o_wb_ext_dat (o_wb_ext_dat),
-      .o_wb_ext_sel (o_wb_ext_sel),
-      .o_wb_ext_we  (o_wb_ext_we),
-      .o_wb_ext_stb (o_wb_ext_stb),
-      .i_wb_ext_rdt (i_wb_ext_rdt),
-      .i_wb_ext_ack (i_wb_ext_ack));
-
-   servile_arbiter arbiter
-     (.i_wb_cpu_dbus_adr (wb_dmem_adr),
-      .i_wb_cpu_dbus_dat (wb_dmem_dat),
-      .i_wb_cpu_dbus_sel (wb_dmem_sel),
-      .i_wb_cpu_dbus_we  (wb_dmem_we ),
-      .i_wb_cpu_dbus_stb (wb_dmem_stb),
-      .o_wb_cpu_dbus_rdt (wb_dmem_rdt),
-      .o_wb_cpu_dbus_ack (wb_dmem_ack),
-
-      .i_wb_cpu_ibus_adr (wb_ibus_adr),
-      .i_wb_cpu_ibus_stb (wb_ibus_stb),
-      .o_wb_cpu_ibus_rdt (wb_ibus_rdt),
-      .o_wb_cpu_ibus_ack (wb_ibus_ack),
-
-      .o_wb_mem_adr (o_wb_mem_adr),
-      .o_wb_mem_dat (o_wb_mem_dat),
-      .o_wb_mem_sel (o_wb_mem_sel),
-      .o_wb_mem_we  (o_wb_mem_we ),
-      .o_wb_mem_stb (o_wb_mem_stb),
-      .i_wb_mem_rdt (i_wb_mem_rdt),
-      .i_wb_mem_ack (i_wb_mem_ack));
-
-
-
-   serv_rf_ram_if
-     #(.width    (rf_width),
-       .W        (width),
-       .reset_strategy (reset_strategy),
-       .csr_regs (with_csr*4))
-   rf_ram_if
-     (.i_clk    (i_clk),
-      .i_rst    (i_rst),
-      //RF IF
-      .i_wreq   (rf_wreq),
-      .i_rreq   (rf_rreq),
-      .o_ready  (rf_ready),
-      .i_wreg0  (wreg0),
-      .i_wreg1  (wreg1),
-      .i_wen0   (wen0),
-      .i_wen1   (wen1),
-      .i_wdata0 (wdata0),
-      .i_wdata1 (wdata1),
-      .i_rreg0  (rreg0),
-      .i_rreg1  (rreg1),
-      .o_rdata0 (rdata0),
-      .o_rdata1 (rdata1),
-      //SRAM IF
-      .o_waddr  (o_rf_waddr),
-      .o_wdata  (o_rf_wdata),
-      .o_wen    (o_rf_wen),
-      .o_raddr  (o_rf_raddr),
-      .o_ren    (o_rf_ren),
-      .i_rdata  (i_rf_rdata));
-
-   generate
-      if (with_mdu) begin : gen_mdu
-	 mdu_top mdu_serv
-	   (.i_clk       (i_clk),
-	    .i_rst       (i_rst),
-	    .i_mdu_rs1   (mdu_rs1),
-	    .i_mdu_rs2   (mdu_rs2),
-	    .i_mdu_op    (mdu_op),
-	    .i_mdu_valid (mdu_valid),
-	    .o_mdu_ready (mdu_ready),
-	    .o_mdu_rd    (mdu_rd));
-      end else begin
-	 assign mdu_ready = 1'b0;
-	 assign mdu_rd = 32'd0;
-      end
-   endgenerate
-
-   serv_top
-     #(
-       .WITH_CSR       (with_csr?1:0),
-       .W              (width),
-       .PRE_REGISTER   (1'b1),
-       .RESET_STRATEGY (reset_strategy),
-       .RESET_PC       (reset_pc),
-       .DEBUG          (debug),
-       .MDU            (with_mdu),
-       .COMPRESSED     (with_c))
-   cpu
-     (
-      .clk         (i_clk),
-      .i_rst       (i_rst),
-      .i_timer_irq (i_timer_irq),
-
-`ifdef RISCV_FORMAL
-      .rvfi_valid     (),
-      .rvfi_order     (),
-      .rvfi_insn      (),
-      .rvfi_trap      (),
-      .rvfi_halt      (),
-      .rvfi_intr      (),
-      .rvfi_mode      (),
-      .rvfi_ixl       (),
-      .rvfi_rs1_addr  (),
-      .rvfi_rs2_addr  (),
-      .rvfi_rs1_rdata (),
-      .rvfi_rs2_rdata (),
-      .rvfi_rd_addr   (),
-      .rvfi_rd_wdata  (),
-      .rvfi_pc_rdata  (),
-      .rvfi_pc_wdata  (),
-      .rvfi_mem_addr  (),
-      .rvfi_mem_rmask (),
-      .rvfi_mem_wmask (),
-      .rvfi_mem_rdata (),
-      .rvfi_mem_wdata (),
-`endif
-      //RF IF
-      .o_rf_rreq   (rf_rreq),
-      .o_rf_wreq   (rf_wreq),
-      .i_rf_ready  (rf_ready),
-      .o_wreg0     (wreg0),
-      .o_wreg1     (wreg1),
-      .o_wen0      (wen0),
-      .o_wen1      (wen1),
-      .o_wdata0    (wdata0),
-      .o_wdata1    (wdata1),
-      .o_rreg0     (rreg0),
-      .o_rreg1     (rreg1),
-      .i_rdata0    (rdata0),
-      .i_rdata1    (rdata1),
-
-      //Instruction bus
-      .o_ibus_adr  (wb_ibus_adr),
-      .o_ibus_cyc  (wb_ibus_stb),
-      .i_ibus_rdt  (wb_ibus_rdt),
-      .i_ibus_ack  (wb_ibus_ack),
-
-      //Data bus
-      .o_dbus_adr  (wb_dbus_adr),
-      .o_dbus_dat  (wb_dbus_dat),
-      .o_dbus_sel  (wb_dbus_sel),
-      .o_dbus_we   (wb_dbus_we),
-      .o_dbus_cyc  (wb_dbus_stb),
-      .i_dbus_rdt  (wb_dbus_rdt),
-      .i_dbus_ack  (wb_dbus_ack),
-
-      //Extension IF
-      .o_ext_rs1    (mdu_rs1),
-      .o_ext_rs2    (mdu_rs2),
-      .o_ext_funct3 (mdu_op),
-      .i_ext_rd     (mdu_rd),
-      .i_ext_ready  (mdu_ready),
-      //MDU
-      .o_mdu_valid  (mdu_valid));
-
-endmodule
-`default_nettype wire
-/*
- * servile_arbiter.v : I/D arbiter for the servile convenience wrapper.
- *  Relies on the fact that not ibus and dbus are active at the same time.
- *
- * SPDX-FileCopyrightText: 2024 Olof Kindgren <olof.kindgren@gmail.com>
- * SPDX-License-Identifier: Apache-2.0
- */
-
-module servile_arbiter
-  (
-   input wire [31:0]  i_wb_cpu_dbus_adr,
-   input wire [31:0]  i_wb_cpu_dbus_dat,
-   input wire [3:0]   i_wb_cpu_dbus_sel,
-   input wire 	      i_wb_cpu_dbus_we,
-   input wire 	      i_wb_cpu_dbus_stb,
-   output wire [31:0] o_wb_cpu_dbus_rdt,
-   output wire 	      o_wb_cpu_dbus_ack,
-
-   input wire [31:0]  i_wb_cpu_ibus_adr,
-   input wire 	      i_wb_cpu_ibus_stb,
-   output wire [31:0] o_wb_cpu_ibus_rdt,
-   output wire 	      o_wb_cpu_ibus_ack,
-
-   output wire [31:0] o_wb_mem_adr,
-   output wire [31:0] o_wb_mem_dat,
-   output wire [3:0]  o_wb_mem_sel,
-   output wire 	      o_wb_mem_we,
-   output wire 	      o_wb_mem_stb,
-   input wire [31:0]  i_wb_mem_rdt,
-   input wire 	      i_wb_mem_ack);
-
-   assign o_wb_cpu_dbus_rdt = i_wb_mem_rdt;
-   assign o_wb_cpu_dbus_ack = i_wb_mem_ack & !i_wb_cpu_ibus_stb;
-
-   assign o_wb_cpu_ibus_rdt = i_wb_mem_rdt;
-   assign o_wb_cpu_ibus_ack = i_wb_mem_ack & i_wb_cpu_ibus_stb;
-
-   assign o_wb_mem_adr = i_wb_cpu_ibus_stb ? i_wb_cpu_ibus_adr : i_wb_cpu_dbus_adr;
-   assign o_wb_mem_dat = i_wb_cpu_dbus_dat;
-   assign o_wb_mem_sel = i_wb_cpu_dbus_sel;
-   assign o_wb_mem_we  = i_wb_cpu_dbus_we & !i_wb_cpu_ibus_stb;
-   assign o_wb_mem_stb = i_wb_cpu_ibus_stb | i_wb_cpu_dbus_stb;
-
-
-endmodule
-/*
- * servile_mux.v : Simple Wishbone mux for the servile convenience wrapper.
- *
- * SPDX-FileCopyrightText: 2024 Olof Kindgren <olof.kindgren@gmail.com>
- * SPDX-License-Identifier: Apache-2.0
- */
-
-module servile_mux
-  #(parameter [0:0]  sim = 1'b0, //Enable simulation features
-    parameter [31:0] sim_sig_adr = 32'h80000000,
-    parameter [31:0] sim_halt_adr = 32'h90000000)
-   (
-    input wire	       i_clk,
-    input wire	       i_rst,
-
-    input wire [31:0]  i_wb_cpu_adr,
-    input wire [31:0]  i_wb_cpu_dat,
-    input wire [3:0]   i_wb_cpu_sel,
-    input wire	       i_wb_cpu_we,
-    input wire	       i_wb_cpu_stb,
-    output wire [31:0] o_wb_cpu_rdt,
-    output wire	       o_wb_cpu_ack,
-
-    output wire [31:0] o_wb_mem_adr,
-    output wire [31:0] o_wb_mem_dat,
-    output wire [3:0]  o_wb_mem_sel,
-    output wire	       o_wb_mem_we,
-    output wire	       o_wb_mem_stb,
-    input wire [31:0]  i_wb_mem_rdt,
-    input wire	       i_wb_mem_ack,
-
-    output wire [31:0] o_wb_ext_adr,
-    output wire [31:0] o_wb_ext_dat,
-    output wire [3:0]  o_wb_ext_sel,
-    output wire	       o_wb_ext_we,
-    output wire	       o_wb_ext_stb,
-    input wire [31:0]  i_wb_ext_rdt,
-    input wire	       i_wb_ext_ack);
-
-   wire		       sig_en;
-   wire		       halt_en;
-   reg		       sim_ack;
-
-   wire		       ext = (i_wb_cpu_adr[31:30] != 2'b00);
-   //wire ext = (i_wb_cpu_adr[31:28] != 4'h8);
-   assign o_wb_cpu_rdt = ext ? i_wb_ext_rdt : i_wb_mem_rdt;
-   assign o_wb_cpu_ack = i_wb_ext_ack | i_wb_mem_ack | sim_ack;
-
-   assign o_wb_mem_adr = i_wb_cpu_adr;
-   assign o_wb_mem_dat = i_wb_cpu_dat;
-   assign o_wb_mem_sel = i_wb_cpu_sel;
-   assign o_wb_mem_we  = i_wb_cpu_we;
-   assign o_wb_mem_stb = i_wb_cpu_stb & !ext & !(sig_en|halt_en);
-
-   assign o_wb_ext_adr = i_wb_cpu_adr;
-   assign o_wb_ext_dat = i_wb_cpu_dat;
-   assign o_wb_ext_sel = i_wb_cpu_sel;
-   assign o_wb_ext_we  = i_wb_cpu_we;
-   assign o_wb_ext_stb = i_wb_cpu_stb & ext & !(sig_en|halt_en);
-
-   generate
-      if (sim) begin
-
-	 integer      f = 0;
-
-	 assign sig_en  = |f & i_wb_cpu_we & (i_wb_cpu_adr == sim_sig_adr);
-	 assign halt_en = i_wb_cpu_we & (i_wb_cpu_adr == sim_halt_adr);
-
-	 reg [1023:0] signature_file;
-
-	 initial
-	   /* verilator lint_off WIDTH */
-	   if ($value$plusargs("signature=%s", signature_file)) begin
-	      $display("Writing signature to %0s", signature_file);
-	      f = $fopen(signature_file, "w");
-	   end
-	 /* verilator lint_on WIDTH */
-
-	 always @(posedge i_clk) begin
-	    sim_ack <= 1'b0;
-	    if (i_wb_cpu_stb & !sim_ack) begin
-	       sim_ack <= sig_en|halt_en;
-	       if (sig_en & (f != 0))
-		 $fwrite(f, "%c", i_wb_cpu_dat[7:0]);
-	       else if(halt_en) begin
-		  $display("Test complete");
-		  $finish;
-	       end
-	    end
-	    if (i_rst)
-	      sim_ack <= 1'b0;
-	 end
-      end else begin
-	 assign sig_en = 1'b0;
-	 assign halt_en = 1'b0;
-	 initial sim_ack = 1'b0;
-      end
-   endgenerate
-
-endmodule
-`timescale 1ns / 1ps
-
-module ServCore #(
-    parameter AW             = 32,
-    parameter USER_WIDTH     = 0,
-    parameter ID_WIDTH       = 0,
-    parameter memfile        = "",
-    parameter memsize        = 8192,
-    parameter sim            = 1'b0,
-    parameter RESET_STRATEGY = "MINI",
-    parameter WITH_CSR       = 1
-)(
-    input  wire clk,
-    input  wire rst,
-    input  wire i_timer_irq,
-
-    // WB2AXI AXI SIGNALS FROM BRIDGE TO EXTERNAL
-    output wire [AW-1:0]         o_awmaddr,
-    output wire                  o_awmvalid,
-    input  wire                  i_awmready,
-    output wire [ID_WIDTH:0]   o_awm_id,
-    output wire [7:0]            o_awm_len,
-    output wire [2:0]            o_awm_size,
-    output wire [1:0]            o_awm_burst,
-    output wire                  o_awm_lock,
-    output wire [3:0]            o_awm_cache,
-    output wire [2:0]            o_awm_prot,
-    output wire [3:0]            o_awm_qos,
-    output wire [3:0]            o_awm_region,
-    output wire [5:0]            o_awm_atop,
-    output wire [USER_WIDTH:0] o_awm_user,
-
-    output wire [AW-1:0]         o_armaddr,
-    output wire                  o_armvalid,
-    input  wire                  i_armready,
-    output wire [ID_WIDTH:0]   o_arm_id,
-    output wire [7:0]            o_arm_len,
-    output wire [2:0]            o_arm_size,
-    output wire [1:0]            o_arm_burst,
-    output wire                  o_arm_lock,
-    output wire [3:0]            o_arm_cache,
-    output wire [2:0]            o_arm_prot,
-    output wire [3:0]            o_arm_qos,
-    output wire [3:0]            o_arm_region,
-    output wire [USER_WIDTH:0] o_arm_user,
-
-    output wire [31:0]           o_wmdata,
-    output wire [3:0]            o_wmstrb,
-    output wire                  o_wmvalid,
-    input  wire                  i_wmready,
-    output wire                  o_wm_last,
-    output wire [USER_WIDTH:0] o_wm_user,
-
-    input  wire [1:0]            i_bmresp,
-    input  wire                  i_bmvalid,
-    output wire                  o_bmready,
-    input  wire [ID_WIDTH:0]   i_bm_id,
-    input  wire [USER_WIDTH:0] i_bm_user,
-
-    input  wire [31:0]           i_rmdata,
-    input  wire [1:0]            i_rmresp,
-    input  wire                  i_rmlast,
-    input  wire                  i_rmvalid,
-    output wire                  o_rmready,
-    input  wire [ID_WIDTH:0]   i_rm_id,
-    input  wire [USER_WIDTH:0] i_rm_user,
-
-    // AXI2WB SIGNALS FROM AXI TO SERVING
-    input  wire [AW-1:0] i_awaddr,
-    input  wire          i_awvalid,
-    output wire          o_awready,
-    input  wire [ID_WIDTH-1:0]    i_aw_id,
-    input  wire [7:0]           i_aw_len,
-    input  wire [2:0]           i_aw_size,
-    input  wire [1:0]           i_aw_burst,
-    input  wire                 i_aw_lock,
-    input  wire [3:0]           i_aw_cache,
-    input  wire [2:0]           i_aw_prot,
-    input  wire [3:0]           i_aw_qos,
-    input  wire [3:0]            i_aw_region,
-    input  wire [USER_WIDTH-1:0]  i_aw_user,
-    input wire [5:0]            i_aw_top, 
-    
-    input  wire [AW-1:0] i_araddr,
-    input  wire          i_arvalid,
-    output wire          o_arready,
-    input  wire [ID_WIDTH-1:0]    i_ar_id,
-    input  wire [7:0]           i_ar_len,
-    input  wire [2:0]           i_ar_size,
-    input  wire [1:0]           i_ar_burst,
-    input  wire                 i_ar_lock,
-    input  wire [3:0]           i_ar_cache,
-    input  wire [2:0]           i_ar_prot,
-    input  wire [3:0]           i_ar_qos,
-    input  wire [3:0]           i_ar_region,
-    input  wire [USER_WIDTH-1:0]  i_ar_user,
-
-    
-    input  wire [31:0]   i_wdata,
-    input  wire [3:0]    i_wstrb,
-    input  wire          i_wvalid,
-    output wire          o_wready,
-    input  wire                 i_w_last,
-    input  wire [USER_WIDTH-1:0]  i_w_user,
-    
-    output wire [1:0]    o_bresp,
-    output wire          o_bvalid,
-    input  wire          i_bready,
-    output wire [ID_WIDTH-1:0]     o_b_id,
-    output wire [USER_WIDTH-1:0]   o_b_user,
-    
-    output wire [31:0]   o_rdata,
-    output wire [1:0]    o_rresp,
-    output wire          o_rlast,
-    output wire          o_rvalid,
-    input  wire          i_rready,
-    output wire [ID_WIDTH-1:0]     o_r_id,
-    output wire [USER_WIDTH-1:0]   o_r_user    
-);
-
-    // Internal Wishbone interface (SERV <-> Bridge)
-    wire [AW-1:0] i_swb_adr;
-    wire [31:0]   i_swb_dat;
-    wire [3:0]    i_swb_sel;
-    wire         i_swb_we;
-    wire         i_swb_stb;
-    wire [31:0]  o_swb_rdt;
-    wire         o_swb_ack;
-
-    // External Wishbone interface (Bridge <-> SERV)
-    wire [AW-1:0] o_mwb_adr;
-    wire [31:0]   o_mwb_dat;
-    wire [3:0]    o_mwb_sel;
-    wire         o_mwb_we;
-    wire         o_mwb_stb;
-    wire [31:0]   i_mwb_rdt;
-    wire          i_mwb_ack;
-
-    // Bridge <-> SERV mux control
-    wire sel_wadr, sel_wdata, sel_radr, sel_rdata, sel_wen;
-
-       // Tie off unused AXI signals
-    generate
-  if (ID_WIDTH > 0) begin
-    assign o_b_id = {ID_WIDTH{1'b0}};
-    assign o_r_id = {ID_WIDTH{1'b0}};
-  end
-endgenerate
-
-generate
-  if (USER_WIDTH > 0) begin
-    assign o_b_user = {USER_WIDTH{1'b0}};
-    assign o_r_user = {USER_WIDTH{1'b0}};
-  end
-endgenerate
-    
-    assign o_awm_id     = 1'b0;
-    assign o_awm_len    = 8'b0;
-    assign o_awm_size   = 3'b0;
-    assign o_awm_burst  = 2'b0;
-    assign o_awm_lock   = 1'b0;
-    assign o_awm_cache  = 4'b0;
-    assign o_awm_prot   = 3'b0;
-    assign o_awm_qos    = 4'b0;
-    assign o_awm_region = 4'b0;
-    assign o_awm_atop   = 6'b0;
-    assign o_awm_user   = 1'b0;
-
-    assign o_wm_last    = 1'b0;
-    assign o_wm_user    = 1'b0;
-    
-    assign o_arm_id     = 1'b0;
-    assign o_arm_len    = 8'b0;
-    assign o_arm_size   = 3'b0;
-    assign o_arm_burst  = 2'b0;
-    assign o_arm_lock   = 1'b0;
-    assign o_arm_cache  = 4'b0;
-    assign o_arm_prot   = 3'b0;
-    assign o_arm_qos    = 4'b0;
-    assign o_arm_region = 4'b0;
-    assign o_arm_user   = 1'b0;
-
-    // Instantiate SERV-based SoC
-    serving #(
-        .memfile(memfile),
-        .memsize(memsize),
-        .sim(sim),
-        .RESET_STRATEGY(RESET_STRATEGY),
-        .WITH_CSR(WITH_CSR)
-    ) serving (
-        .i_clk(clk),
-        .i_rst(rst),
-        .i_timer_irq(i_timer_irq),
-
-        // Master WB (SERV → Bridge)
-        .o_wb_adr(i_swb_adr),
-        .o_wb_dat(i_swb_dat),
-        .o_wb_sel(i_swb_sel),
-        .o_wb_we(i_swb_we),
-        .o_wb_stb(i_swb_stb),
-        .i_wb_rdt(o_swb_rdt),
-        .i_wb_ack(o_swb_ack),
-
-        // Slave WB (Bridge → SERV)
-        .adr_brg(o_mwb_adr),
-        .data_brg(o_mwb_dat),
-        .stb_brg(o_mwb_stb),
-        .wen_brg(o_mwb_we),
-        .sel_brg(o_mwb_sel),
-        .rdt_brg(i_mwb_rdt),
-        .ack_brg(i_mwb_ack),
-
-        // mux selection signals from bridge
-        .sel_wadr(sel_wadr),
-        .sel_wdata(sel_wdata),
-        .sel_radr(sel_radr),
-        .sel_rdata(sel_rdata),
-        .sel_wen(sel_wen)
-    );
-
-    // Instantiate AXI-Wishbone bridge
-    complete_bridge #(.AW(AW)) bridge (
-        .i_clk(clk),
-        .i_rst(rst),
-
-        // Wishbone slave (SERV master → Bridge)
-        .i_swb_adr(i_swb_adr),
-        .i_swb_dat(i_swb_dat),
-        .i_swb_sel(i_swb_sel),
-        .i_swb_we(i_swb_we),
-        .i_swb_stb(i_swb_stb),
-        .o_swb_rdt(o_swb_rdt),
-        .o_swb_ack(o_swb_ack),
-
-        // Wishbone master (Bridge → SERV slave)
-        .o_mwb_adr(o_mwb_adr),
-        .o_mwb_dat(o_mwb_dat),
-        .o_mwb_sel(o_mwb_sel),
-        .o_mwb_we(o_mwb_we),
-        .o_mwb_stb(o_mwb_stb),
-        .i_mwb_rdt(i_mwb_rdt),
-        .i_mwb_ack(i_mwb_ack),
-
-        // AXI slave (external → bridge)
-        .i_awaddr(i_awaddr),
-        .i_awvalid(i_awvalid),
-        .o_awready(o_awready),
-        .i_araddr(i_araddr),
-        .i_arvalid(i_arvalid),
-        .o_arready(o_arready),
-        .i_wdata(i_wdata),
-        .i_wstrb(i_wstrb),
-        .i_wvalid(i_wvalid),
-        .o_wready(o_wready),
-        .o_bresp(o_bresp),
-        .o_bvalid(o_bvalid),
-        .i_bready(i_bready),
-        .o_rdata(o_rdata),
-        .o_rresp(o_rresp),
-        .o_rlast(o_rlast),
-        .o_rvalid(o_rvalid),
-        .i_rready(i_rready),
-
-        // AXI master (bridge → external)
-        .o_awmaddr(o_awmaddr),
-        .o_awmvalid(o_awmvalid),
-        .i_awmready(i_awmready),
-        .o_armaddr(o_armaddr),
-        .o_armvalid(o_armvalid),
-        .i_armready(i_armready),
-        .o_wmdata(o_wmdata),
-        .o_wmstrb(o_wmstrb),
-        .o_wmvalid(o_wmvalid),
-        .i_wmready(i_wmready),
-        .i_bmresp(i_bmresp),
-        .i_bmvalid(i_bmvalid),
-        .o_bmready(o_bmready),
-        .i_rmdata(i_rmdata),
-        .i_rmresp(i_rmresp),
-        .i_rmlast(i_rmlast),
-        .i_rmvalid(i_rmvalid),
-        .o_rmready(o_rmready),
-
-        // mux selection outputs
-        .sel_wadr(sel_wadr),
-        .sel_wdata(sel_wdata),
-        .sel_radr(sel_radr),
-        .sel_rdata(sel_rdata),
-        .sel_wen(sel_wen)
-    );
-
-endmodule
-
- 
-
-   
 `default_nettype none
 module complete_bridge
   #(parameter AW = 32)
@@ -3932,1161 +4329,302 @@ end
                      end
                      end
   endmodule
-module serv_aligner
-   (
-    input wire clk,
-    input wire rst,
-    // serv_top
-    input  wire [31:0]  i_ibus_adr,
-    input  wire         i_ibus_cyc,
-    output wire [31:0]  o_ibus_rdt,
-    output wire         o_ibus_ack,
-    // serv_rf_top
-    output wire [31:0]  o_wb_ibus_adr,
-    output wire         o_wb_ibus_cyc,
-    input  wire [31:0]  i_wb_ibus_rdt,
-    input  wire         i_wb_ibus_ack);
+`timescale 1ns / 1ps
 
-    wire [31:0] ibus_rdt_concat;
-    wire        ack_en;
+module ServCore #(
+    parameter AW             = 32,
+    parameter USER_WIDTH     = 0,
+    parameter ID_WIDTH       = 0,
+    parameter memfile        = "",
+    parameter memsize        = 8192,
+    parameter sim            = 1'b0,
+    parameter RESET_STRATEGY = "MINI",
+    parameter WITH_CSR       = 1
+)(
+    input  wire clk,
+    input  wire rst,
+    input  wire i_timer_irq,
 
-    reg  [15:0] lower_hw;
-    reg         ctrl_misal ;
+    // WB2AXI AXI SIGNALS FROM BRIDGE TO EXTERNAL
+    output wire [AW-1:0]         o_awmaddr,
+    output wire                  o_awmvalid,
+    input  wire                  i_awmready,
+    output wire [ID_WIDTH:0]   o_awm_id,
+    output wire [7:0]            o_awm_len,
+    output wire [2:0]            o_awm_size,
+    output wire [1:0]            o_awm_burst,
+    output wire                  o_awm_lock,
+    output wire [3:0]            o_awm_cache,
+    output wire [2:0]            o_awm_prot,
+    output wire [3:0]            o_awm_qos,
+    output wire [3:0]            o_awm_region,
+    output wire [5:0]            o_awm_atop,
+    output wire [USER_WIDTH:0] o_awm_user,
 
-    /* From SERV core to Memory
+    output wire [AW-1:0]         o_armaddr,
+    output wire                  o_armvalid,
+    input  wire                  i_armready,
+    output wire [ID_WIDTH:0]   o_arm_id,
+    output wire [7:0]            o_arm_len,
+    output wire [2:0]            o_arm_size,
+    output wire [1:0]            o_arm_burst,
+    output wire                  o_arm_lock,
+    output wire [3:0]            o_arm_cache,
+    output wire [2:0]            o_arm_prot,
+    output wire [3:0]            o_arm_qos,
+    output wire [3:0]            o_arm_region,
+    output wire [USER_WIDTH:0] o_arm_user,
 
-    o_wb_ibus_adr: Carries address of instruction to memory. In case of misaligned access,
-    which is caused by pc+2 due to compressed instruction, next instruction is fetched
-    by pc+4 and concatenation is done to make the instruction aligned.
+    output wire [31:0]           o_wmdata,
+    output wire [3:0]            o_wmstrb,
+    output wire                  o_wmvalid,
+    input  wire                  i_wmready,
+    output wire                  o_wm_last,
+    output wire [USER_WIDTH:0] o_wm_user,
 
-    o_wb_ibus_cyc: Simply forwarded from SERV to Memory and is only altered by memory or SERV core.
-    */
-    assign o_wb_ibus_adr = ctrl_misal ? (i_ibus_adr+32'b100) : i_ibus_adr;
-    assign o_wb_ibus_cyc = i_ibus_cyc;
+    input  wire [1:0]            i_bmresp,
+    input  wire                  i_bmvalid,
+    output wire                  o_bmready,
+    input  wire [ID_WIDTH:0]   i_bm_id,
+    input  wire [USER_WIDTH:0] i_bm_user,
 
-    /* From Memory to SERV core
+    input  wire [31:0]           i_rmdata,
+    input  wire [1:0]            i_rmresp,
+    input  wire                  i_rmlast,
+    input  wire                  i_rmvalid,
+    output wire                  o_rmready,
+    input  wire [ID_WIDTH:0]   i_rm_id,
+    input  wire [USER_WIDTH:0] i_rm_user,
 
-        o_ibus_ack: Instruction bus acknowledge is send to SERV only when the aligned instruction,
-        either compressed or un-compressed, is ready to dispatch.
+    // AXI2WB SIGNALS FROM AXI TO SERVING
+    input  wire [AW-1:0] i_awaddr,
+    input  wire          i_awvalid,
+    output wire          o_awready,
+    input  wire [ID_WIDTH-1:0]    i_aw_id,
+    input  wire [7:0]           i_aw_len,
+    input  wire [2:0]           i_aw_size,
+    input  wire [1:0]           i_aw_burst,
+    input  wire                 i_aw_lock,
+    input  wire [3:0]           i_aw_cache,
+    input  wire [2:0]           i_aw_prot,
+    input  wire [3:0]           i_aw_qos,
+    input  wire [3:0]            i_aw_region,
+    input  wire [USER_WIDTH-1:0]  i_aw_user,
+    input wire [5:0]            i_aw_atop, 
+    
+    input  wire [AW-1:0] i_araddr,
+    input  wire          i_arvalid,
+    output wire          o_arready,
+    input  wire [ID_WIDTH-1:0]    i_ar_id,
+    input  wire [7:0]           i_ar_len,
+    input  wire [2:0]           i_ar_size,
+    input  wire [1:0]           i_ar_burst,
+    input  wire                 i_ar_lock,
+    input  wire [3:0]           i_ar_cache,
+    input  wire [2:0]           i_ar_prot,
+    input  wire [3:0]           i_ar_qos,
+    input  wire [3:0]           i_ar_region,
+    input  wire [USER_WIDTH-1:0]  i_ar_user,
 
-        o_ibus_rdt: Carries the instruction from memory to SERV core. It can be either aligned
-        instruction coming from memory or made aligned by two bus transactions and concatenation.
-    */
-    assign o_ibus_ack = i_wb_ibus_ack & ack_en;
-    assign o_ibus_rdt = ctrl_misal ? ibus_rdt_concat : i_wb_ibus_rdt;
+    
+    input  wire [31:0]   i_wdata,
+    input  wire [3:0]    i_wstrb,
+    input  wire          i_wvalid,
+    output wire          o_wready,
+    input  wire                 i_w_last,
+    input  wire [USER_WIDTH-1:0]  i_w_user,
+    
+    output wire [1:0]    o_bresp,
+    output wire          o_bvalid,
+    input  wire          i_bready,
+    output wire [ID_WIDTH-1:0]     o_b_id,
+    output wire [USER_WIDTH-1:0]   o_b_user,
+    
+    output wire [31:0]   o_rdata,
+    output wire [1:0]    o_rresp,
+    output wire          o_rlast,
+    output wire          o_rvalid,
+    input  wire          i_rready,
+    output wire [ID_WIDTH-1:0]     o_r_id,
+    output wire [USER_WIDTH-1:0]   o_r_user    
+);
 
-    /* 16-bit register used to hold the upper half word of the current instruction in-case
-       concatenation will be required with the upper half word of upcoming instruction
-    */
-    always @(posedge clk) begin
-        if(i_wb_ibus_ack)begin
-            lower_hw <= i_wb_ibus_rdt[31:16];
-        end
-    end
+    // Internal Wishbone interface (SERV <-> Bridge)
+    wire [AW-1:0] i_swb_adr;
+    wire [31:0]   i_swb_dat;
+    wire [3:0]    i_swb_sel;
+    wire         i_swb_we;
+    wire         i_swb_stb;
+    wire [31:0]  o_swb_rdt;
+    wire         o_swb_ack;
 
-    assign ibus_rdt_concat = {i_wb_ibus_rdt[15:0],lower_hw};
+    // External Wishbone interface (Bridge <-> SERV)
+    wire [AW-1:0] o_mwb_adr;
+    wire [31:0]   o_mwb_dat;
+    wire [3:0]    o_mwb_sel;
+    wire         o_mwb_we;
+    wire         o_mwb_stb;
+    wire [31:0]   i_mwb_rdt;
+    wire          i_mwb_ack;
 
-    /* Two control signals: ack_en, ctrl_misal are set to control the bus transactions between
-    SERV core and the memory
-    */
-    assign ack_en   = !(i_ibus_adr[1] & !ctrl_misal);
+    // Bridge <-> SERV mux control
+    wire sel_wadr, sel_wdata, sel_radr, sel_rdata, sel_wen;
 
-    always @(posedge clk ) begin
-        if(rst)
-            ctrl_misal <= 0;
-        else if(i_wb_ibus_ack & i_ibus_adr[1])
-            ctrl_misal <= !ctrl_misal;
-    end
-
-endmodule
-/* Copyright lowRISC contributors.
-Copyright 2018 ETH Zurich and University of Bologna, see also CREDITS.md.
-Licensed under the Apache License, Version 2.0, see LICENSE for details.
-SPDX-License-Identifier: Apache-2.0
-
-* Adapted to SERV by @Abdulwadoodd as part of the project under spring '22 LFX Mentorship program */
-
-/* Decodes RISC-V compressed instructions into their RV32i equivalent. */
-
-module serv_compdec
-  (
-   input wire i_clk,
-   input  wire [31:0] i_instr,
-   input  wire i_ack,
-   output wire [31:0] o_instr,
-   output reg o_iscomp);
-
-  localparam OPCODE_LOAD     = 7'h03;
-  localparam OPCODE_OP_IMM   = 7'h13;
-  localparam OPCODE_STORE    = 7'h23;
-  localparam OPCODE_OP       = 7'h33;
-  localparam OPCODE_LUI      = 7'h37;
-  localparam OPCODE_BRANCH   = 7'h63;
-  localparam OPCODE_JALR     = 7'h67;
-  localparam OPCODE_JAL      = 7'h6f;
-
-  reg  [31:0] comp_instr;
-  reg  illegal_instr;
-
-  assign o_instr = illegal_instr ? i_instr : comp_instr;
-
-  always @(posedge i_clk) begin
-    if(i_ack)
-      o_iscomp <= !illegal_instr;
+       // Tie off unused AXI signals
+    generate
+  if (ID_WIDTH > 0) begin
+    assign o_b_id = {ID_WIDTH{1'b0}};
+    assign o_r_id = {ID_WIDTH{1'b0}};
   end
+endgenerate
 
-  always @ (*) begin
-    // By default, forward incoming instruction, mark it as legal.
-    comp_instr    = i_instr;
-    illegal_instr = 1'b0;
-
-    // Check if incoming instruction is compressed.
-    case (i_instr[1:0])
-      // C0
-      2'b00: begin
-        case (i_instr[15:14])
-          2'b00: begin
-            // c.addi4spn -> addi rd', x2, imm
-            comp_instr = {2'b0, i_instr[10:7], i_instr[12:11], i_instr[5],
-                      i_instr[6], 2'b00, 5'h02, 3'b000, 2'b01, i_instr[4:2], {OPCODE_OP_IMM}};
-          end
-
-          2'b01: begin
-            // c.lw -> lw rd', imm(rs1')
-            comp_instr = {5'b0, i_instr[5], i_instr[12:10], i_instr[6],
-                      2'b00, 2'b01, i_instr[9:7], 3'b010, 2'b01, i_instr[4:2], {OPCODE_LOAD}};
-          end
-
-          2'b11: begin
-            // c.sw -> sw rs2', imm(rs1')
-            comp_instr = {5'b0, i_instr[5], i_instr[12], 2'b01, i_instr[4:2],
-                      2'b01, i_instr[9:7], 3'b010, i_instr[11:10], i_instr[6],
-                      2'b00, {OPCODE_STORE}};
-          end
-
-          2'b10: begin
-            illegal_instr = 1'b1;
-          end
-
-        endcase
-      end
-
-      // C1
-
-      // Register address checks for RV32E are performed in the regular instruction decoder.
-      // If this check fails, an illegal instruction exception is triggered and the controller
-      // writes the actual faulting instruction to mtval.
-      2'b01: begin
-        case (i_instr[15:13])
-          3'b000: begin
-            // c.addi -> addi rd, rd, nzimm
-            // c.nop
-            comp_instr = {{6 {i_instr[12]}}, i_instr[12], i_instr[6:2],
-                      i_instr[11:7], 3'b0, i_instr[11:7], {OPCODE_OP_IMM}};
-          end
-
-          3'b001, 3'b101: begin
-            // 001: c.jal -> jal x1, imm
-            // 101: c.j   -> jal x0, imm
-            comp_instr = {i_instr[12], i_instr[8], i_instr[10:9], i_instr[6],
-                      i_instr[7], i_instr[2], i_instr[11], i_instr[5:3],
-                      {9 {i_instr[12]}}, 4'b0, ~i_instr[15], {OPCODE_JAL}};
-          end
-
-          3'b010: begin
-            // c.li -> addi rd, x0, nzimm
-            // (c.li hints are translated into an addi hint)
-            comp_instr = {{6 {i_instr[12]}}, i_instr[12], i_instr[6:2], 5'b0,
-                      3'b0, i_instr[11:7], {OPCODE_OP_IMM}};
-          end
-
-          3'b011: begin
-            // c.lui -> lui rd, imm
-            // (c.lui hints are translated into a lui hint)
-            comp_instr = {{15 {i_instr[12]}}, i_instr[6:2], i_instr[11:7], {OPCODE_LUI}};
-
-            if (i_instr[11:7] == 5'h02) begin
-              // c.addi16sp -> addi x2, x2, nzimm
-              comp_instr = {{3 {i_instr[12]}}, i_instr[4:3], i_instr[5], i_instr[2],
-                        i_instr[6], 4'b0, 5'h02, 3'b000, 5'h02, {OPCODE_OP_IMM}};
-            end
-
-          end
-
-          3'b100: begin
-            case (i_instr[11:10])
-              2'b00,
-              2'b01: begin
-                // 00: c.srli -> srli rd, rd, shamt
-                // 01: c.srai -> srai rd, rd, shamt
-                // (c.srli/c.srai hints are translated into a srli/srai hint)
-                comp_instr = {1'b0, i_instr[10], 5'b0, i_instr[6:2], 2'b01, i_instr[9:7],
-                          3'b101, 2'b01, i_instr[9:7], {OPCODE_OP_IMM}};
-              end
-
-              2'b10: begin
-                // c.andi -> andi rd, rd, imm
-                comp_instr = {{6 {i_instr[12]}}, i_instr[12], i_instr[6:2], 2'b01, i_instr[9:7],
-                          3'b111, 2'b01, i_instr[9:7], {OPCODE_OP_IMM}};
-              end
-
-              2'b11: begin
-                case (i_instr[6:5])
-                  2'b00: begin
-                    // c.sub -> sub rd', rd', rs2'
-                    comp_instr = {2'b01, 5'b0, 2'b01, i_instr[4:2], 2'b01, i_instr[9:7],
-                                  3'b000, 2'b01, i_instr[9:7], {OPCODE_OP}};
-                  end
-
-                  2'b01: begin
-                    // c.xor -> xor rd', rd', rs2'
-                    comp_instr = {7'b0, 2'b01, i_instr[4:2], 2'b01, i_instr[9:7], 3'b100,
-                              2'b01, i_instr[9:7], {OPCODE_OP}};
-                  end
-
-                  2'b10: begin
-                    // c.or  -> or  rd', rd', rs2'
-                    comp_instr = {7'b0, 2'b01, i_instr[4:2], 2'b01, i_instr[9:7], 3'b110,
-                              2'b01, i_instr[9:7], {OPCODE_OP}};
-                  end
-
-                  2'b11: begin
-                    // c.and -> and rd', rd', rs2'
-                    comp_instr = {7'b0, 2'b01, i_instr[4:2], 2'b01, i_instr[9:7], 3'b111,
-                              2'b01, i_instr[9:7], {OPCODE_OP}};
-                  end
-                endcase
-              end
-            endcase
-          end
-
-          3'b110, 3'b111: begin
-            // 0: c.beqz -> beq rs1', x0, imm
-            // 1: c.bnez -> bne rs1', x0, imm
-            comp_instr = {{4 {i_instr[12]}}, i_instr[6:5], i_instr[2], 5'b0, 2'b01,
-                      i_instr[9:7], 2'b00, i_instr[13], i_instr[11:10], i_instr[4:3],
-                      i_instr[12], {OPCODE_BRANCH}};
-          end
-        endcase
-      end
-
-      // C2
-
-      // Register address checks for RV32E are performed in the regular instruction decoder.
-      // If this check fails, an illegal instruction exception is triggered and the controller
-      // writes the actual faulting instruction to mtval.
-      2'b10: begin
-        case (i_instr[15:14])
-          2'b00: begin
-            // c.slli -> slli rd, rd, shamt
-            // (c.ssli hints are translated into a slli hint)
-            comp_instr = {7'b0, i_instr[6:2], i_instr[11:7], 3'b001, i_instr[11:7], {OPCODE_OP_IMM}};
-          end
-
-          2'b01: begin
-            // c.lwsp -> lw rd, imm(x2)
-            comp_instr = {4'b0, i_instr[3:2], i_instr[12], i_instr[6:4], 2'b00, 5'h02,
-                      3'b010, i_instr[11:7], OPCODE_LOAD};
-          end
-
-          2'b10: begin
-            if (i_instr[12] == 1'b0) begin
-              if (i_instr[6:2] != 5'b0) begin
-                // c.mv -> add rd/rs1, x0, rs2
-                // (c.mv hints are translated into an add hint)
-                comp_instr = {7'b0, i_instr[6:2], 5'b0, 3'b0, i_instr[11:7], {OPCODE_OP}};
-              end else begin
-                // c.jr -> jalr x0, rd/rs1, 0
-                comp_instr = {12'b0, i_instr[11:7], 3'b0, 5'b0, {OPCODE_JALR}};
-              end
-            end else begin
-              if (i_instr[6:2] != 5'b0) begin
-                // c.add -> add rd, rd, rs2
-                // (c.add hints are translated into an add hint)
-                comp_instr = {7'b0, i_instr[6:2], i_instr[11:7], 3'b0, i_instr[11:7], {OPCODE_OP}};
-              end else begin
-                if (i_instr[11:7] == 5'b0) begin
-                  // c.ebreak -> ebreak
-                  comp_instr = {32'h00_10_00_73};
-                end else begin
-                  // c.jalr -> jalr x1, rs1, 0
-                  comp_instr = {12'b0, i_instr[11:7], 3'b000, 5'b00001, {OPCODE_JALR}};
-                end
-              end
-            end
-          end
-
-          2'b11: begin
-            // c.swsp -> sw rs2, imm(x2)
-            comp_instr = {4'b0, i_instr[8:7], i_instr[12], i_instr[6:2], 5'h02, 3'b010,
-                      i_instr[11:9], 2'b00, {OPCODE_STORE}};
-          end
-        endcase
-      end
-
-      // Incoming instruction is not compressed.
-      2'b11: illegal_instr = 1'b1;
-
-    endcase
+generate
+  if (USER_WIDTH > 0) begin
+    assign o_b_user = {USER_WIDTH{1'b0}};
+    assign o_r_user = {USER_WIDTH{1'b0}};
   end
+endgenerate
+    
+    assign o_awm_id     = 1'b0;
+    assign o_awm_len    = 8'b0;
+    assign o_awm_size   = 3'b0;
+    assign o_awm_burst  = 2'b0;
+    assign o_awm_lock   = 1'b0;
+    assign o_awm_cache  = 4'b0;
+    assign o_awm_prot   = 3'b0;
+    assign o_awm_qos    = 4'b0;
+    assign o_awm_region = 4'b0;
+    assign o_awm_atop   = 6'b0;
+    assign o_awm_user   = 1'b0;
 
-  endmodule
-`default_nettype none
-module serv_csr
-  #(
-    parameter RESET_STRATEGY = "MINI",
-    parameter W = 1,
-    parameter B = W-1
-  )
-  (
-   input wire 	    i_clk,
-   input wire 	    i_rst,
-   //State
-   input wire 	    i_trig_irq,
-   input wire 	    i_en,
-   input wire 	    i_cnt0to3,
-   input wire 	    i_cnt3,
-   input wire 	    i_cnt7,
-   input wire 	    i_cnt11,
-   input wire 	    i_cnt12,
-   input wire 	    i_cnt_done,
-   input wire 	    i_mem_op,
-   input wire 	    i_mtip,
-   input wire 	    i_trap,
-   output reg 	    o_new_irq,
-   //Control
-   input wire 	    i_e_op,
-   input wire 	    i_ebreak,
-   input wire 	    i_mem_cmd,
-   input wire 	    i_mstatus_en,
-   input wire 	    i_mie_en,
-   input wire 	    i_mcause_en,
-   input wire [1:0] i_csr_source,
-   input wire 	    i_mret,
-   input wire 	    i_csr_d_sel,
-   //Data
-   input wire 	[B:0]    i_rf_csr_out,
-   output wire 	[B:0]    o_csr_in,
-   input wire 	[B:0]    i_csr_imm,
-   input wire 	[B:0]    i_rs1,
-   output wire 	[B:0]    o_q);
+    assign o_wm_last    = 1'b0;
+    assign o_wm_user    = 1'b0;
+    
+    assign o_arm_id     = 1'b0;
+    assign o_arm_len    = 8'b0;
+    assign o_arm_size   = 3'b0;
+    assign o_arm_burst  = 2'b0;
+    assign o_arm_lock   = 1'b0;
+    assign o_arm_cache  = 4'b0;
+    assign o_arm_prot   = 3'b0;
+    assign o_arm_qos    = 4'b0;
+    assign o_arm_region = 4'b0;
+    assign o_arm_user   = 1'b0;
 
-   localparam [1:0]
-     CSR_SOURCE_CSR = 2'b00,
-     CSR_SOURCE_EXT = 2'b01,
-     CSR_SOURCE_SET = 2'b10,
-     CSR_SOURCE_CLR = 2'b11;
+    // Instantiate SERV-based SoC
+    serving #(
+        .memfile(memfile),
+        .memsize(memsize),
+        .sim(sim),
+        .RESET_STRATEGY(RESET_STRATEGY),
+        .WITH_CSR(WITH_CSR)
+    ) serving (
+        .i_clk(clk),
+        .i_rst(rst),
+        .i_timer_irq(i_timer_irq),
 
-   reg 		    mstatus_mie;
-   reg 		    mstatus_mpie;
-   reg 		    mie_mtie;
+        // Master WB (SERV → Bridge)
+        .o_wb_adr(i_swb_adr),
+        .o_wb_dat(i_swb_dat),
+        .o_wb_sel(i_swb_sel),
+        .o_wb_we(i_swb_we),
+        .o_wb_stb(i_swb_stb),
+        .i_wb_rdt(o_swb_rdt),
+        .i_wb_ack(o_swb_ack),
 
-   reg 		mcause31;
-   reg [3:0] 	mcause3_0;
-   wire [B:0]	mcause;
+        // Slave WB (Bridge → SERV)
+        .adr_brg(o_mwb_adr),
+        .data_brg(o_mwb_dat),
+        .stb_brg(o_mwb_stb),
+        .wen_brg(o_mwb_we),
+        .sel_brg(o_mwb_sel),
+        .rdt_brg(i_mwb_rdt),
+        .ack_brg(i_mwb_ack),
 
-   wire [B:0]	csr_in;
-   wire [B:0]	csr_out;
+        // mux selection signals from bridge
+        .sel_wadr(sel_wadr),
+        .sel_wdata(sel_wdata),
+        .sel_radr(sel_radr),
+        .sel_rdata(sel_rdata),
+        .sel_wen(sel_wen)
+    );
 
-   reg 		timer_irq_r;
+    // Instantiate AXI-Wishbone bridge
+    complete_bridge #(.AW(AW)) bridge (
+        .i_clk(clk),
+        .i_rst(rst),
 
-   wire [B:0]	d = i_csr_d_sel ? i_csr_imm : i_rs1;
+        // Wishbone slave (SERV master → Bridge)
+        .i_swb_adr(i_swb_adr),
+        .i_swb_dat(i_swb_dat),
+        .i_swb_sel(i_swb_sel),
+        .i_swb_we(i_swb_we),
+        .i_swb_stb(i_swb_stb),
+        .o_swb_rdt(o_swb_rdt),
+        .o_swb_ack(o_swb_ack),
 
-   assign csr_in = (i_csr_source == CSR_SOURCE_EXT) ? d :
-		   (i_csr_source == CSR_SOURCE_SET) ? csr_out | d :
-		   (i_csr_source == CSR_SOURCE_CLR) ? csr_out & ~d :
-		   (i_csr_source == CSR_SOURCE_CSR) ? csr_out :
-		   {W{1'bx}};
+        // Wishbone master (Bridge → SERV slave)
+        .o_mwb_adr(o_mwb_adr),
+        .o_mwb_dat(o_mwb_dat),
+        .o_mwb_sel(o_mwb_sel),
+        .o_mwb_we(o_mwb_we),
+        .o_mwb_stb(o_mwb_stb),
+        .i_mwb_rdt(i_mwb_rdt),
+        .i_mwb_ack(i_mwb_ack),
 
-   wire [B:0]	mstatus;
+        // AXI slave (external → bridge)
+        .i_awaddr(i_awaddr),
+        .i_awvalid(i_awvalid),
+        .o_awready(o_awready),
+        .i_araddr(i_araddr),
+        .i_arvalid(i_arvalid),
+        .o_arready(o_arready),
+        .i_wdata(i_wdata),
+        .i_wstrb(i_wstrb),
+        .i_wvalid(i_wvalid),
+        .o_wready(o_wready),
+        .o_bresp(o_bresp),
+        .o_bvalid(o_bvalid),
+        .i_bready(i_bready),
+        .o_rdata(o_rdata),
+        .o_rresp(o_rresp),
+        .o_rlast(o_rlast),
+        .o_rvalid(o_rvalid),
+        .i_rready(i_rready),
 
-   generate
-      if (W==1) begin : gen_mstatus_w1
-	 assign mstatus = ((mstatus_mie & i_cnt3) | (i_cnt11 | i_cnt12));
-      end else if (W==4) begin : gen_mstatus_w4
-	 assign mstatus = {i_cnt11 | (mstatus_mie & i_cnt3), 2'b00, i_cnt12};
-      end
-   endgenerate
+        // AXI master (bridge → external)
+        .o_awmaddr(o_awmaddr),
+        .o_awmvalid(o_awmvalid),
+        .i_awmready(i_awmready),
+        .o_armaddr(o_armaddr),
+        .o_armvalid(o_armvalid),
+        .i_armready(i_armready),
+        .o_wmdata(o_wmdata),
+        .o_wmstrb(o_wmstrb),
+        .o_wmvalid(o_wmvalid),
+        .i_wmready(i_wmready),
+        .i_bmresp(i_bmresp),
+        .i_bmvalid(i_bmvalid),
+        .o_bmready(o_bmready),
+        .i_rmdata(i_rmdata),
+        .i_rmresp(i_rmresp),
+        .i_rmlast(i_rmlast),
+        .i_rmvalid(i_rmvalid),
+        .o_rmready(o_rmready),
 
-   assign csr_out = ({W{i_mstatus_en & i_en}} & mstatus) |
-		    i_rf_csr_out |
-		    ({W{i_mcause_en & i_en}} & mcause);
-
-   assign o_q = csr_out;
-
-   wire 	timer_irq = i_mtip & mstatus_mie & mie_mtie;
-
-   assign mcause = i_cnt0to3 ? mcause3_0[B:0] : //[3:0]
-		   i_cnt_done ? {mcause31,{B{1'b0}}} //[31]
-		   : {W{1'b0}};
-
-   assign o_csr_in = csr_in;
-
-   always @(posedge i_clk) begin
-      if (i_trig_irq) begin
-	 timer_irq_r <= timer_irq;
-	 o_new_irq   <= timer_irq & !timer_irq_r;
-      end
-
-      if (i_mie_en & i_cnt7)
-	mie_mtie <= csr_in[B];
-
-      /*
-       The mie bit in mstatus gets updated under three conditions
-
-       When a trap is taken, the bit is cleared
-       During an mret instruction, the bit is restored from mpie
-       During a mstatus CSR access instruction it's assigned when
-        bit 3 gets updated
-
-       These conditions are all mutually exclusive
-       */
-      if ((i_trap & i_cnt_done) | i_mstatus_en & i_cnt3 & i_en | i_mret)
-	mstatus_mie <= !i_trap & (i_mret ?  mstatus_mpie : csr_in[B]);
-
-      /*
-       Note: To save resources mstatus_mpie (mstatus bit 7) is not
-       readable or writable from sw
-       */
-      if (i_trap & i_cnt_done)
-	mstatus_mpie <= mstatus_mie;
-
-      /*
-       The four lowest bits in mcause hold the exception code
-
-       These bits get updated under three conditions
-
-       During an mcause CSR access function, they are assigned when
-       bits 0 to 3 gets updated
-
-       During an external interrupt the exception code is set to
-       7, since SERV only support timer interrupts
-
-       During an exception, the exception code is assigned to indicate
-       if it was caused by an ebreak instruction (3),
-       ecall instruction (11), misaligned load (4), misaligned store (6)
-       or misaligned jump (0)
-
-       The expressions below are derived from the following truth table
-       irq  => 0111 (timer=7)
-       e_op => x011 (ebreak=3, ecall=11)
-       mem  => 01x0 (store=6, load=4)
-       ctrl => 0000 (jump=0)
-       */
-      if (i_mcause_en & i_en & i_cnt0to3 | (i_trap & i_cnt_done)) begin
-	 mcause3_0[3] <= (i_e_op & !i_ebreak) | (!i_trap & csr_in[B]);
-	 mcause3_0[2] <= o_new_irq | i_mem_op | (!i_trap & ((W == 1) ? mcause3_0[3] : csr_in[(W == 1) ? 0 : 2]));
-	 mcause3_0[1] <= o_new_irq | i_e_op | (i_mem_op & i_mem_cmd) | (!i_trap & ((W == 1) ? mcause3_0[2] : csr_in[(W == 1) ? 0 : 1]));
-	 mcause3_0[0] <= o_new_irq | i_e_op | (!i_trap & ((W == 1) ? mcause3_0[1] : csr_in[0]));
-      end
-      if (i_mcause_en & i_cnt_done | i_trap)
-	mcause31 <= i_trap ? o_new_irq : csr_in[B];
-      if (i_rst)
-	if (RESET_STRATEGY != "NONE") begin
-	   o_new_irq <= 1'b0;
-	   mie_mtie <= 1'b0;
-	end
-   end
+        // mux selection outputs
+        .sel_wadr(sel_wadr),
+        .sel_wdata(sel_wdata),
+        .sel_radr(sel_radr),
+        .sel_rdata(sel_rdata),
+        .sel_wen(sel_wen)
+    );
 
 endmodule
-module serv_debug
-  #(parameter W = 1,
-    parameter RESET_PC = 0,
-    //Internally calculated. Do not touch
-    parameter B=W-1)
-   (
-`ifdef RISCV_FORMAL
-    output reg	      rvfi_valid = 1'b0,
-    output reg [63:0]  rvfi_order = 64'd0,
-    output reg [31:0]  rvfi_insn = 32'd0,
-    output reg	      rvfi_trap = 1'b0,
-    output reg	      rvfi_halt = 1'b0,  // Not used
-    output reg	      rvfi_intr = 1'b0,  // Not used
-    output reg [1:0]   rvfi_mode = 2'b11, // Not used
-    output reg [1:0]   rvfi_ixl = 2'b01,  // Not used
-    output reg [4:0]   rvfi_rs1_addr,
-    output reg [4:0]   rvfi_rs2_addr,
-    output reg [31:0]  rvfi_rs1_rdata,
-    output reg [31:0]  rvfi_rs2_rdata,
-    output reg [4:0]   rvfi_rd_addr,
-    output wire [31:0] rvfi_rd_wdata,
-    output reg [31:0]  rvfi_pc_rdata,
-    output wire [31:0]  rvfi_pc_wdata,
-    output reg [31:0]  rvfi_mem_addr,
-    output reg [3:0]   rvfi_mem_rmask,
-    output reg [3:0]   rvfi_mem_wmask,
-    output reg [31:0]  rvfi_mem_rdata,
-    output reg [31:0]  rvfi_mem_wdata,
-    input wire [31:0]  i_dbus_adr,
-    input wire [31:0]  i_dbus_dat,
-    input wire [3:0]   i_dbus_sel,
-    input wire	      i_dbus_we,
-    input wire [31:0]  i_dbus_rdt,
-    input wire	      i_dbus_ack,
-    input wire	      i_ctrl_pc_en,
-    input wire	[B:0]      rs1,
-    input wire [B:0]	      rs2,
-    input wire [4:0]   rs1_addr,
-    input wire [4:0]   rs2_addr,
-    input wire [3:0]   immdec_en,
-    input wire	      rd_en,
-    input wire	      trap,
-    input wire	      i_rf_ready,
-    input wire	      i_ibus_cyc,
-    input wire	      two_stage_op,
-    input wire	      init,
-    input wire [31:0]  i_ibus_adr,
-`endif
-    input wire	      i_clk,
-    input wire	      i_rst,
-    input wire [31:0] i_ibus_rdt,
-    input wire	      i_ibus_ack,
-    input wire [4:0]  i_rd_addr,
-    input wire	      i_cnt_en,
-    input wire [B:0]  i_csr_in,
-    input wire	      i_csr_mstatus_en,
-    input wire	      i_csr_mie_en,
-    input wire	      i_csr_mcause_en,
-    input wire	      i_csr_en,
-    input wire [1:0]  i_csr_addr,
-    input wire	      i_wen0,
-    input wire [B:0]  i_wdata0,
-    input wire	      i_cnt_done);
 
-   reg		      update_rd = 1'b0;
-   reg		      update_mscratch;
-   reg		      update_mtvec;
-   reg		      update_mepc;
-   reg		      update_mtval;
-   reg		      update_mstatus;
-   reg		      update_mie;
-   reg		      update_mcause;
+ 
 
-   reg [31:0]	      dbg_rd = 32'hxxxxxxxx;
-   reg [31:0]	      dbg_csr = 32'hxxxxxxxx;
-   reg [31:0]	      dbg_mstatus  = 32'hxxxxxxxx;
-   reg [31:0]	      dbg_mie      = 32'hxxxxxxxx;
-   reg [31:0]	      dbg_mcause   = 32'hxxxxxxxx;
-   reg [31:0]	      dbg_mscratch = 32'hxxxxxxxx;
-   reg [31:0]	      dbg_mtvec    = 32'hxxxxxxxx;
-   reg [31:0]	      dbg_mepc     = 32'hxxxxxxxx;
-   reg [31:0]	      dbg_mtval    = 32'hxxxxxxxx;
-   reg [31:0]	      x1  = 32'hxxxxxxxx;
-   reg [31:0]	      x2  = 32'hxxxxxxxx;
-   reg [31:0]	      x3  = 32'hxxxxxxxx;
-   reg [31:0]	      x4  = 32'hxxxxxxxx;
-   reg [31:0]	      x5  = 32'hxxxxxxxx;
-   reg [31:0]	      x6  = 32'hxxxxxxxx;
-   reg [31:0]	      x7  = 32'hxxxxxxxx;
-   reg [31:0]	      x8  = 32'hxxxxxxxx;
-   reg [31:0]	      x9  = 32'hxxxxxxxx;
-   reg [31:0]	      x10 = 32'hxxxxxxxx;
-   reg [31:0]	      x11 = 32'hxxxxxxxx;
-   reg [31:0]	      x12 = 32'hxxxxxxxx;
-   reg [31:0]	      x13 = 32'hxxxxxxxx;
-   reg [31:0]	      x14 = 32'hxxxxxxxx;
-   reg [31:0]	      x15 = 32'hxxxxxxxx;
-   reg [31:0]	      x16 = 32'hxxxxxxxx;
-   reg [31:0]	      x17 = 32'hxxxxxxxx;
-   reg [31:0]	      x18 = 32'hxxxxxxxx;
-   reg [31:0]	      x19 = 32'hxxxxxxxx;
-   reg [31:0]	      x20 = 32'hxxxxxxxx;
-   reg [31:0]	      x21 = 32'hxxxxxxxx;
-   reg [31:0]	      x22 = 32'hxxxxxxxx;
-   reg [31:0]	      x23 = 32'hxxxxxxxx;
-   reg [31:0]	      x24 = 32'hxxxxxxxx;
-   reg [31:0]	      x25 = 32'hxxxxxxxx;
-   reg [31:0]	      x26 = 32'hxxxxxxxx;
-   reg [31:0]	      x27 = 32'hxxxxxxxx;
-   reg [31:0]	      x28 = 32'hxxxxxxxx;
-   reg [31:0]	      x29 = 32'hxxxxxxxx;
-   reg [31:0]	      x30 = 32'hxxxxxxxx;
-   reg [31:0]	      x31 = 32'hxxxxxxxx;
-
-   always @(posedge i_clk) begin
-      update_rd <= i_cnt_done & i_wen0;
-
-      if (i_wen0)
-        dbg_rd <= {i_wdata0,dbg_rd[31:W]};
-
-      //End of instruction that writes to RF
-      if (update_rd) begin
-	 case (i_rd_addr)
-	   5'd1  : x1  <= dbg_rd;
-	   5'd2  : x2  <= dbg_rd;
-	   5'd3  : x3  <= dbg_rd;
-	   5'd4  : x4  <= dbg_rd;
-	   5'd5  : x5  <= dbg_rd;
-	   5'd6  : x6  <= dbg_rd;
-	   5'd7  : x7  <= dbg_rd;
-	   5'd8  : x8  <= dbg_rd;
-	   5'd9  : x9  <= dbg_rd;
-	   5'd10 : x10 <= dbg_rd;
-	   5'd11 : x11 <= dbg_rd;
-	   5'd12 : x12 <= dbg_rd;
-	   5'd13 : x13 <= dbg_rd;
-	   5'd14 : x14 <= dbg_rd;
-	   5'd15 : x15 <= dbg_rd;
-	   5'd16 : x16 <= dbg_rd;
-	   5'd17 : x17 <= dbg_rd;
-	   5'd18 : x18 <= dbg_rd;
-	   5'd19 : x19 <= dbg_rd;
-	   5'd20 : x20 <= dbg_rd;
-	   5'd21 : x21 <= dbg_rd;
-	   5'd22 : x22 <= dbg_rd;
-	   5'd23 : x23 <= dbg_rd;
-	   5'd24 : x24 <= dbg_rd;
-	   5'd25 : x25 <= dbg_rd;
-	   5'd26 : x26 <= dbg_rd;
-	   5'd27 : x27 <= dbg_rd;
-	   5'd28 : x28 <= dbg_rd;
-	   5'd29 : x29 <= dbg_rd;
-	   5'd30 : x30 <= dbg_rd;
-	   5'd31 : x31 <= dbg_rd;
-	   default : ;
-	 endcase
-      end
-
-      update_mscratch <= i_cnt_done & i_csr_en & (i_csr_addr == 2'b00);
-      update_mtvec    <= i_cnt_done & i_csr_en & (i_csr_addr == 2'b01);
-      update_mepc     <= i_cnt_done & i_csr_en & (i_csr_addr == 2'b10);
-      update_mtval    <= i_cnt_done & i_csr_en & (i_csr_addr == 2'b11);
-      update_mstatus  <= i_cnt_done & i_csr_mstatus_en;
-      update_mie      <= i_cnt_done & i_csr_mie_en;
-      update_mcause   <= i_cnt_done & i_csr_mcause_en;
-
-      if (i_cnt_en)
-	dbg_csr <= {i_csr_in, dbg_csr[31:W]};
-
-      if (update_mscratch) dbg_mscratch <= dbg_csr;
-      if (update_mtvec)    dbg_mtvec    <= dbg_csr;
-      if (update_mepc )    dbg_mepc     <= dbg_csr;
-      if (update_mtval)    dbg_mtval    <= dbg_csr;
-      if (update_mstatus)  dbg_mstatus  <= dbg_csr;
-      if (update_mie)      dbg_mie      <= dbg_csr;
-      if (update_mcause)   dbg_mcause   <= dbg_csr;
-   end
-
-   reg LUI, AUIPC, JAL, JALR, BEQ, BNE, BLT, BGE, BLTU, BGEU, LB, LH, LW, LBU, LHU, SB, SH, SW, ADDI, SLTI, SLTIU, XORI, ORI, ANDI,SLLI, SRLI, SRAI, ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND, FENCE, ECALL, EBREAK;
-   reg CSRRW, CSRRS, CSRRC, CSRRWI, CSRRSI, CSRRCI;
-   reg OTHER;
-
-   always @(posedge i_clk) begin
-      if (i_ibus_ack) begin
-	 LUI    <= 1'b0;
-	 AUIPC  <= 1'b0;
-	 JAL    <= 1'b0;
-	 JALR   <= 1'b0;
-	 BEQ    <= 1'b0;
-	 BNE    <= 1'b0;
-	 BLT    <= 1'b0;
-	 BGE    <= 1'b0;
-	 BLTU   <= 1'b0;
-	 BGEU   <= 1'b0;
-	 LB     <= 1'b0;
-	 LH     <= 1'b0;
-	 LW     <= 1'b0;
-	 LBU    <= 1'b0;
-	 LHU    <= 1'b0;
-	 SB     <= 1'b0;
-	 SH     <= 1'b0;
-	 SW     <= 1'b0;
-	 ADDI   <= 1'b0;
-	 SLTI   <= 1'b0;
-	 SLTIU  <= 1'b0;
-	 XORI   <= 1'b0;
-	 ORI    <= 1'b0;
-	 ANDI   <= 1'b0;
-	 SLLI   <= 1'b0;
-	 SRLI   <= 1'b0;
-	 SRAI   <= 1'b0;
-	 ADD    <= 1'b0;
-	 SUB    <= 1'b0;
-	 SLL    <= 1'b0;
-	 SLT    <= 1'b0;
-	 SLTU   <= 1'b0;
-	 XOR    <= 1'b0;
-	 SRL    <= 1'b0;
-	 SRA    <= 1'b0;
-	 OR     <= 1'b0;
-	 AND    <= 1'b0;
-	 FENCE  <= 1'b0;
-	 ECALL  <= 1'b0;
-	 EBREAK <= 1'b0;
-	 CSRRW  <= 1'b0;
-	 CSRRS  <= 1'b0;
-	 CSRRC  <= 1'b0;
-	 CSRRWI <= 1'b0;
-	 CSRRSI <= 1'b0;
-	 CSRRCI <= 1'b0;
-	 OTHER  <= 1'b0;
-
-	 casez(i_ibus_rdt)
-	   //  3322222_22222 11111_111 11
-	   //  1098765_43210 98765_432 10987_65432_10
-	   32'b???????_?????_?????_???_?????_01101_11 : LUI    <= 1'b1;
-	   32'b???????_?????_?????_???_?????_00101_11 : AUIPC  <= 1'b1;
-	   32'b???????_?????_?????_???_?????_11011_11 : JAL    <= 1'b1;
-	   32'b???????_?????_?????_000_?????_11001_11 : JALR   <= 1'b1;
-	   32'b???????_?????_?????_000_?????_11000_11 : BEQ    <= 1'b1;
-	   32'b???????_?????_?????_001_?????_11000_11 : BNE    <= 1'b1;
-	   32'b???????_?????_?????_100_?????_11000_11 : BLT    <= 1'b1;
-	   32'b???????_?????_?????_101_?????_11000_11 : BGE    <= 1'b1;
-	   32'b???????_?????_?????_110_?????_11000_11 : BLTU   <= 1'b1;
-	   32'b???????_?????_?????_111_?????_11000_11 : BGEU   <= 1'b1;
-	   32'b???????_?????_?????_000_?????_00000_11 : LB     <= 1'b1;
-	   32'b???????_?????_?????_001_?????_00000_11 : LH     <= 1'b1;
-	   32'b???????_?????_?????_010_?????_00000_11 : LW     <= 1'b1;
-	   32'b???????_?????_?????_100_?????_00000_11 : LBU    <= 1'b1;
-	   32'b???????_?????_?????_101_?????_00000_11 : LHU    <= 1'b1;
-	   32'b???????_?????_?????_000_?????_01000_11 : SB     <= 1'b1;
-	   32'b???????_?????_?????_001_?????_01000_11 : SH     <= 1'b1;
-	   32'b???????_?????_?????_010_?????_01000_11 : SW     <= 1'b1;
-	   32'b???????_?????_?????_000_?????_00100_11 : ADDI   <= 1'b1;
-	   32'b???????_?????_?????_010_?????_00100_11 : SLTI   <= 1'b1;
-	   32'b???????_?????_?????_011_?????_00100_11 : SLTIU  <= 1'b1;
-	   32'b???????_?????_?????_100_?????_00100_11 : XORI   <= 1'b1;
-	   32'b???????_?????_?????_110_?????_00100_11 : ORI    <= 1'b1;
-	   32'b???????_?????_?????_111_?????_00100_11 : ANDI   <= 1'b1;
-	   32'b0000000_?????_?????_001_?????_00100_11 : SLLI   <= 1'b1;
-	   32'b0000000_?????_?????_101_?????_00100_11 : SRLI   <= 1'b1;
-	   32'b0100000_?????_?????_101_?????_00100_11 : SRAI   <= 1'b1;
-	   32'b0000000_?????_?????_000_?????_01100_11 : ADD    <= 1'b1;
-	   32'b0100000_?????_?????_000_?????_01100_11 : SUB    <= 1'b1;
-	   32'b0000000_?????_?????_001_?????_01100_11 : SLL    <= 1'b1;
-	   32'b0000000_?????_?????_010_?????_01100_11 : SLT    <= 1'b1;
-	   32'b0000000_?????_?????_011_?????_01100_11 : SLTU   <= 1'b1;
-	   32'b???????_?????_?????_100_?????_01100_11 : XOR    <= 1'b1;
-	   32'b0000000_?????_?????_101_?????_01100_11 : SRL    <= 1'b1;
-	   32'b0100000_?????_?????_101_?????_01100_11 : SRA    <= 1'b1;
-	   32'b???????_?????_?????_110_?????_01100_11 : OR     <= 1'b1;
-	   32'b???????_?????_?????_111_?????_01100_11 : AND    <= 1'b1;
-	   32'b???????_?????_?????_000_?????_00011_11 : FENCE  <= 1'b1;
-	   32'b0000000_00000_00000_000_00000_11100_11 : ECALL  <= 1'b1;
-	   32'b0000000_00001_00000_000_00000_11100_11 : EBREAK <= 1'b1;
-	   32'b???????_?????_?????_001_?????_11100_11 : CSRRW  <= 1'b1;
-	   32'b???????_?????_?????_010_?????_11100_11 : CSRRS  <= 1'b1;
-	   32'b???????_?????_?????_011_?????_11100_11 : CSRRC  <= 1'b1;
-	   32'b???????_?????_?????_101_?????_11100_11 : CSRRWI <= 1'b1;
-	   32'b???????_?????_?????_110_?????_11100_11 : CSRRSI <= 1'b1;
-	   32'b???????_?????_?????_111_?????_11100_11 : CSRRCI <= 1'b1;
- 	   default : OTHER <= 1'b1;
-	 endcase
-      end
-   end
-
-`ifdef RISCV_FORMAL
-   reg [31:0] 	 pc = RESET_PC;
-
-   wire rs_en = two_stage_op ? init : i_ctrl_pc_en;
-
-   assign rvfi_rd_wdata = update_rd ? dbg_rd : 32'd0;
-
-   always @(posedge i_clk) begin
-      /* End of instruction */
-      rvfi_valid <= i_cnt_done & i_ctrl_pc_en & !i_rst;
-      rvfi_order <= rvfi_order + {63'd0,rvfi_valid};
-
-      /* Get instruction word when it's fetched from ibus */
-      if (i_ibus_cyc & i_ibus_ack)
-	rvfi_insn <= i_ibus_rdt;
-
-
-      if (i_cnt_done & i_ctrl_pc_en) begin
-         rvfi_pc_rdata <= pc;
-	 if (!(rd_en & (|i_rd_addr))) begin
-	   rvfi_rd_addr <= 5'd0;
-	 end
-      end
-      rvfi_trap <= trap;
-      if (rvfi_valid) begin
-         rvfi_trap <= 1'b0;
-         pc <= rvfi_pc_wdata;
-      end
-
-      /* RS1 not valid during J, U instructions (immdec_en[1]) */
-      /* RS2 not valid during I, J, U instructions (immdec_en[2]) */
-      if (i_rf_ready) begin
-	 rvfi_rs1_addr <= !immdec_en[1] ? rs1_addr : 5'd0;
-         rvfi_rs2_addr <= !immdec_en[2] /*rs2_valid*/ ? rs2_addr : 5'd0;
-	 rvfi_rd_addr  <= i_rd_addr;
-      end
-      if (rs_en) begin
-         rvfi_rs1_rdata <= {(!immdec_en[1] ? rs1 : {W{1'b0}}),rvfi_rs1_rdata[31:W]};
-         rvfi_rs2_rdata <= {(!immdec_en[2] ? rs2 : {W{1'b0}}),rvfi_rs2_rdata[31:W]};
-      end
-
-      if (i_dbus_ack) begin
-         rvfi_mem_addr  <= i_dbus_adr;
-         rvfi_mem_rmask <= i_dbus_we ? 4'b0000 : i_dbus_sel;
-         rvfi_mem_wmask <= i_dbus_we ? i_dbus_sel : 4'b0000;
-         rvfi_mem_rdata <= i_dbus_rdt;
-         rvfi_mem_wdata <= i_dbus_dat;
-      end
-      if (i_ibus_ack) begin
-         rvfi_mem_rmask <= 4'b0000;
-         rvfi_mem_wmask <= 4'b0000;
-      end
-   end
-
-   assign rvfi_pc_wdata = i_ibus_adr;
-
-`endif
-
-endmodule
-`default_nettype none
-
-module serv_synth_wrapper
-  #(
-    /* Register signals before or after the decoder
-     0 : Register after the decoder. Faster but uses more resources
-     1 : (default) Register before the decoder. Slower but uses less resources
-     */
-    parameter PRE_REGISTER = 1,
-    /* Amount of reset applied to design
-       "NONE" : No reset at all. Relies on a POR to set correct initialization
-                 values and that core isn't reset during runtime
-       "MINI" : Standard setting. Resets the minimal amount of FFs needed to
-                 restart execution from the instruction at RESET_PC
-     */
-    parameter RESET_STRATEGY = "MINI",
-    parameter WITH_CSR = 1,
-    parameter RF_WIDTH = 2,
-	parameter RF_L2D   = $clog2((32+(WITH_CSR*4))*32/RF_WIDTH))
-  (
-   input wire 		      clk,
-   input wire 		      i_rst,
-   input wire 		      i_timer_irq,
-   output wire [31:0] 	      o_ibus_adr,
-   output wire 		      o_ibus_cyc,
-   input wire [31:0] 	      i_ibus_rdt,
-   input wire 		      i_ibus_ack,
-   output wire [31:0] 	      o_dbus_adr,
-   output wire [31:0] 	      o_dbus_dat,
-   output wire [3:0] 	      o_dbus_sel,
-   output wire 		      o_dbus_we ,
-   output wire 		      o_dbus_cyc,
-   input wire [31:0] 	      i_dbus_rdt,
-   input wire 		      i_dbus_ack,
-
-   output wire [RF_L2D-1:0]   o_waddr,
-   output wire [RF_WIDTH-1:0] o_wdata,
-   output wire 		      o_wen,
-   output wire [RF_L2D-1:0]   o_raddr,
-   input wire [RF_WIDTH-1:0]  i_rdata);
-
-   localparam CSR_REGS = WITH_CSR*4;
-
-   wire 	      rf_wreq;
-   wire 	      rf_rreq;
-   wire [4+WITH_CSR:0] wreg0;
-   wire [4+WITH_CSR:0] wreg1;
-   wire 	      wen0;
-   wire 	      wen1;
-   wire 	      wdata0;
-   wire 	      wdata1;
-   wire [4+WITH_CSR:0] rreg0;
-   wire [4+WITH_CSR:0] rreg1;
-   wire 	      rf_ready;
-   wire 	      rdata0;
-   wire 	      rdata1;
-
-   serv_rf_ram_if
-     #(.width    (RF_WIDTH),
-       .reset_strategy (RESET_STRATEGY),
-       .csr_regs (CSR_REGS))
-   rf_ram_if
-     (.i_clk    (clk),
-      .i_rst    (i_rst),
-      .i_wreq   (rf_wreq),
-      .i_rreq   (rf_rreq),
-      .o_ready  (rf_ready),
-      .i_wreg0  (wreg0),
-      .i_wreg1  (wreg1),
-      .i_wen0   (wen0),
-      .i_wen1   (wen1),
-      .i_wdata0 (wdata0),
-      .i_wdata1 (wdata1),
-      .i_rreg0  (rreg0),
-      .i_rreg1  (rreg1),
-      .o_rdata0 (rdata0),
-      .o_rdata1 (rdata1),
-      .o_waddr  (o_waddr),
-      .o_wdata  (o_wdata),
-      .o_wen    (o_wen),
-      .o_raddr  (o_raddr),
-      .i_rdata  (i_rdata));
-
-   serv_top
-     #(.RESET_PC (32'd0),
-       .PRE_REGISTER (PRE_REGISTER),
-       .RESET_STRATEGY (RESET_STRATEGY),
-       .WITH_CSR (WITH_CSR),
-       .MDU(1'b0))
-   cpu
-     (
-      .clk      (clk),
-      .i_rst    (i_rst),
-      .i_timer_irq  (i_timer_irq),
-      .o_rf_rreq   (rf_rreq),
-      .o_rf_wreq   (rf_wreq),
-      .i_rf_ready  (rf_ready),
-      .o_wreg0     (wreg0),
-      .o_wreg1     (wreg1),
-      .o_wen0      (wen0),
-      .o_wen1      (wen1),
-      .o_wdata0    (wdata0),
-      .o_wdata1    (wdata1),
-      .o_rreg0     (rreg0),
-      .o_rreg1     (rreg1),
-      .i_rdata0    (rdata0),
-      .i_rdata1    (rdata1),
-
-      .o_ibus_adr   (o_ibus_adr),
-      .o_ibus_cyc   (o_ibus_cyc),
-      .i_ibus_rdt   (i_ibus_rdt),
-      .i_ibus_ack   (i_ibus_ack),
-
-      .o_dbus_adr   (o_dbus_adr),
-      .o_dbus_dat   (o_dbus_dat),
-      .o_dbus_sel   (o_dbus_sel),
-      .o_dbus_we    (o_dbus_we),
-      .o_dbus_cyc   (o_dbus_cyc),
-      .i_dbus_rdt   (i_dbus_rdt),
-      .i_dbus_ack   (i_dbus_ack),
-
-      //Extension
-      .o_ext_funct3 (),
-      .i_ext_ready  (1'b0),
-      .i_ext_rd     (32'd0),
-      .o_ext_rs1    (),
-      .o_ext_rs2    (),
-      //MDU
-      .o_mdu_valid  ());
-
-endmodule
-`default_nettype wire
-`default_nettype none
-
-module serv_rf_top
-  #(parameter RESET_PC = 32'd0,
-    /*  COMPRESSED=1: Enable the compressed decoder and allowed misaligned jump of pc
-        COMPRESSED=0: Disable the compressed decoder and does not allow the misaligned jump of pc
-    */
-    parameter [0:0] COMPRESSED = 0,
-    /*
-      ALIGN = 1: Fetch the aligned instruction by making two bus transactions if the misaligned address
-      is given to the instruction bus.
-    */
-    parameter [0:0] ALIGN = COMPRESSED,
-    /* Multiplication and Division Unit
-       This parameter enables the interface for connecting SERV and MDU
-    */
-    parameter [0:0] MDU = 0,
-    /* Register signals before or after the decoder
-       0 : Register after the decoder. Faster but uses more resources
-       1 : (default) Register before the decoder. Slower but uses less resources
-     */
-    parameter PRE_REGISTER = 1,
-    /* Amount of reset applied to design
-       "NONE" : No reset at all. Relies on a POR to set correct initialization
-                 values and that core isn't reset during runtime
-       "MINI" : Standard setting. Resets the minimal amount of FFs needed to
-                 restart execution from the instruction at RESET_PC
-     */
-    parameter RESET_STRATEGY = "MINI",
-    parameter [0:0] DEBUG = 1'b0,
-    parameter WITH_CSR = 1,
-    parameter W        = 1,
-    parameter RF_WIDTH = W * 2,
-	parameter RF_L2D   = $clog2((32+(WITH_CSR*4))*32/RF_WIDTH))
-  (
-   input wire 	      clk,
-   input wire 	      i_rst,
-   input wire 	      i_timer_irq,
-`ifdef RISCV_FORMAL
-   output wire 	      rvfi_valid,
-   output wire [63:0] rvfi_order,
-   output wire [31:0] rvfi_insn,
-   output wire 	      rvfi_trap,
-   output wire 	      rvfi_halt,
-   output wire 	      rvfi_intr,
-   output wire [1:0]  rvfi_mode,
-   output wire [1:0]  rvfi_ixl,
-   output wire [4:0]  rvfi_rs1_addr,
-   output wire [4:0]  rvfi_rs2_addr,
-   output wire [31:0] rvfi_rs1_rdata,
-   output wire [31:0] rvfi_rs2_rdata,
-   output wire [4:0]  rvfi_rd_addr,
-   output wire [31:0] rvfi_rd_wdata,
-   output wire [31:0] rvfi_pc_rdata,
-   output wire [31:0] rvfi_pc_wdata,
-   output wire [31:0] rvfi_mem_addr,
-   output wire [3:0]  rvfi_mem_rmask,
-   output wire [3:0]  rvfi_mem_wmask,
-   output wire [31:0] rvfi_mem_rdata,
-   output wire [31:0] rvfi_mem_wdata,
-`endif
-   output wire [31:0] o_ibus_adr,
-   output wire 	      o_ibus_cyc,
-   input wire [31:0]  i_ibus_rdt,
-   input wire 	      i_ibus_ack,
-   output wire [31:0] o_dbus_adr,
-   output wire [31:0] o_dbus_dat,
-   output wire [3:0]  o_dbus_sel,
-   output wire 	      o_dbus_we ,
-   output wire 	      o_dbus_cyc,
-   input wire [31:0]  i_dbus_rdt,
-   input wire 	      i_dbus_ack,
-
-   // Extension
-   output wire [31:0] o_ext_rs1,
-   output wire [31:0] o_ext_rs2,
-   output wire [ 2:0] o_ext_funct3,
-   input  wire [31:0] i_ext_rd,
-   input  wire        i_ext_ready,
-   // MDU
-   output wire        o_mdu_valid);
-
-   localparam CSR_REGS = WITH_CSR*4;
-
-   wire 	      rf_wreq;
-   wire 	      rf_rreq;
-   wire [4+WITH_CSR:0] wreg0;
-   wire [4+WITH_CSR:0] wreg1;
-   wire 	      wen0;
-   wire 	      wen1;
-   wire [W-1:0]	      wdata0;
-   wire [W-1:0]	      wdata1;
-   wire [4+WITH_CSR:0] rreg0;
-   wire [4+WITH_CSR:0] rreg1;
-   wire 	      rf_ready;
-   wire [W-1:0]	      rdata0;
-   wire [W-1:0]	      rdata1;
-
-   wire [RF_L2D-1:0]   waddr;
-   wire [RF_WIDTH-1:0] wdata;
-   wire 	       wen;
-   wire [RF_L2D-1:0]   raddr;
-   wire 	       ren;
-   wire [RF_WIDTH-1:0] rdata;
-
-   serv_rf_ram_if
-     #(.width    (RF_WIDTH),
-       .reset_strategy (RESET_STRATEGY),
-       .csr_regs (CSR_REGS),
-       .W(W))
-   rf_ram_if
-     (.i_clk    (clk),
-      .i_rst    (i_rst),
-      .i_wreq   (rf_wreq),
-      .i_rreq   (rf_rreq),
-      .o_ready  (rf_ready),
-      .i_wreg0  (wreg0),
-      .i_wreg1  (wreg1),
-      .i_wen0   (wen0),
-      .i_wen1   (wen1),
-      .i_wdata0 (wdata0),
-      .i_wdata1 (wdata1),
-      .i_rreg0  (rreg0),
-      .i_rreg1  (rreg1),
-      .o_rdata0 (rdata0),
-      .o_rdata1 (rdata1),
-      .o_waddr  (waddr),
-      .o_wdata  (wdata),
-      .o_wen    (wen),
-      .o_raddr  (raddr),
-      .o_ren    (ren),
-      .i_rdata  (rdata));
-
-   serv_rf_ram
-     #(.width (RF_WIDTH),
-       .csr_regs (CSR_REGS))
-   rf_ram
-     (.i_clk    (clk),
-      .i_waddr (waddr),
-      .i_wdata (wdata),
-      .i_wen   (wen),
-      .i_raddr (raddr),
-      .i_ren    (ren),
-      .o_rdata (rdata));
-
-   serv_top
-     #(.RESET_PC (RESET_PC),
-       .PRE_REGISTER (PRE_REGISTER),
-       .RESET_STRATEGY (RESET_STRATEGY),
-       .WITH_CSR (WITH_CSR),
-       .DEBUG (DEBUG),
-       .MDU(MDU),
-       .COMPRESSED(COMPRESSED),
-       .ALIGN(ALIGN),
-       .W(W))
-   cpu
-     (
-      .clk      (clk),
-      .i_rst    (i_rst),
-      .i_timer_irq  (i_timer_irq),
-`ifdef RISCV_FORMAL
-      .rvfi_valid     (rvfi_valid    ),
-      .rvfi_order     (rvfi_order    ),
-      .rvfi_insn      (rvfi_insn     ),
-      .rvfi_trap      (rvfi_trap     ),
-      .rvfi_halt      (rvfi_halt     ),
-      .rvfi_intr      (rvfi_intr     ),
-      .rvfi_mode      (rvfi_mode     ),
-      .rvfi_ixl       (rvfi_ixl      ),
-      .rvfi_rs1_addr  (rvfi_rs1_addr ),
-      .rvfi_rs2_addr  (rvfi_rs2_addr ),
-      .rvfi_rs1_rdata (rvfi_rs1_rdata),
-      .rvfi_rs2_rdata (rvfi_rs2_rdata),
-      .rvfi_rd_addr   (rvfi_rd_addr  ),
-      .rvfi_rd_wdata  (rvfi_rd_wdata ),
-      .rvfi_pc_rdata  (rvfi_pc_rdata ),
-      .rvfi_pc_wdata  (rvfi_pc_wdata ),
-      .rvfi_mem_addr  (rvfi_mem_addr ),
-      .rvfi_mem_rmask (rvfi_mem_rmask),
-      .rvfi_mem_wmask (rvfi_mem_wmask),
-      .rvfi_mem_rdata (rvfi_mem_rdata),
-      .rvfi_mem_wdata (rvfi_mem_wdata),
-`endif
-      .o_rf_rreq   (rf_rreq),
-      .o_rf_wreq   (rf_wreq),
-      .i_rf_ready  (rf_ready),
-      .o_wreg0     (wreg0),
-      .o_wreg1     (wreg1),
-      .o_wen0      (wen0),
-      .o_wen1      (wen1),
-      .o_wdata0    (wdata0),
-      .o_wdata1    (wdata1),
-      .o_rreg0     (rreg0),
-      .o_rreg1     (rreg1),
-      .i_rdata0    (rdata0),
-      .i_rdata1    (rdata1),
-
-      .o_ibus_adr   (o_ibus_adr),
-      .o_ibus_cyc   (o_ibus_cyc),
-      .i_ibus_rdt   (i_ibus_rdt),
-      .i_ibus_ack   (i_ibus_ack),
-
-      .o_dbus_adr   (o_dbus_adr),
-      .o_dbus_dat   (o_dbus_dat),
-      .o_dbus_sel   (o_dbus_sel),
-      .o_dbus_we    (o_dbus_we),
-      .o_dbus_cyc   (o_dbus_cyc),
-      .i_dbus_rdt   (i_dbus_rdt),
-      .i_dbus_ack   (i_dbus_ack),
-
-      //Extension
-      .o_ext_funct3 (o_ext_funct3),
-      .i_ext_ready  (i_ext_ready),
-      .i_ext_rd     (i_ext_rd),
-      .o_ext_rs1    (o_ext_rs1),
-      .o_ext_rs2    (o_ext_rs2),
-      //MDU
-      .o_mdu_valid  (o_mdu_valid));
-
-endmodule
-`default_nettype wire
+   
 
 module ServCoreBlackbox 
 #(
@@ -5102,135 +4640,135 @@ module ServCoreBlackbox
 
 (
     // CORE TOP
-    input   clk,
-    input   rst,
-    input   i_timer_irq,
+    input   wire clk,
+    input   wire rst,
+    input   wire i_timer_irq,
 
     // AXI2WB -- AXI SIGNALS FROM EXTERNAL(BUS/PERIPHERAL/ADAPTER) TO BRIDGE
 
     // AXI address write channel
-    input   [AW_B-1:0] i_awaddr,
-    input   i_awvalid,
-    output  o_awready,
+    input   wire [AW_B-1:0] i_awaddr,
+    input   wire i_awvalid,
+    output  wire o_awready,
      //unused signals
-    input  [ID_WIDTH-1:0] i_aw_id,
-    input  [7:0] i_aw_len,
-    input  [3:0] i_aw_size,
-    input  [1:0] i_aw_burst,
-    input  i_aw_lock,
-    input  [3:0] i_aw_cache,
-    input  [2:0] i_aw_prot,
-    input  [3:0] i_aw_qos,
-    input  [3:0] i_aw_region,
-    input  [5:0] i_aw_atop,
-    input  [USER_WIDTH-1:0] i_aw_user,
+    input  wire [ID_WIDTH:0] i_aw_id,
+    input  wire [7:0] i_aw_len,
+    input  wire [2:0] i_aw_size,
+    input  wire [1:0] i_aw_burst,
+    input  wire i_aw_lock,
+    input  wire [3:0] i_aw_cache,
+    input  wire [2:0] i_aw_prot,
+    input  wire [3:0] i_aw_qos,
+    input  wire [3:0] i_aw_region,
+    input  wire [5:0] i_aw_atop,
+    input  wire [USER_WIDTH:0] i_aw_user,
 
     // AXI address read channel 
-    input   [AW_B-1:0] i_araddr,
-    input   i_arvalid,
-    output  o_arready,
+    input   wire [AW_B-1:0] i_araddr,
+    input   wire i_arvalid,
+    output  wire o_arready,
     //unused signals
-    input [ID_WIDTH-1:0] i_ar_id,
-    input  [7:0] i_ar_len,
-    input  [2:0] i_ar_size,
-    input  [1:0] i_ar_burst,
-    input  i_ar_lock,
-    input  [3:0]i_ar_cache,
-    input  [2:0]i_ar_prot,
-    input  [3:0]i_ar_qos,
-    input  [3:0]i_ar_region,
-    input  [USER_WIDTH-1:0] i_ar_user,
+    input wire [ID_WIDTH:0] i_ar_id,
+    input  wire [7:0] i_ar_len,
+    input  wire [2:0] i_ar_size,
+    input  wire [1:0] i_ar_burst,
+    input  wire i_ar_lock,
+    input  wire [3:0]i_ar_cache,
+    input  wire [2:0]i_ar_prot,
+    input  wire [3:0]i_ar_qos,
+    input  wire [3:0]i_ar_region,
+    input  wire [USER_WIDTH:0] i_ar_user,
    
     // AXI write channel
-    input   [31:0] i_wdata,
-    input   [3:0] i_wstrb,
-    input   i_wvalid,
-    output  o_wready,
+    input   wire [31:0] i_wdata,
+    input   wire [3:0] i_wstrb,
+    input   wire i_wvalid,
+    output  wire o_wready,
    //unused signals
-    input   i_w_last,
-    input  [USER_WIDTH-1:0] i_w_user,
+    input   wire i_w_last,
+    input  wire [USER_WIDTH:0] i_w_user,
 
     // AXI response channel
-    input   i_bready,
-    output  [1:0] o_bresp,
-    output  o_bvalid,
+    input   wire i_bready,
+    output  wire [1:0] o_bresp,
+    output  wire o_bvalid,
    //unused signals 
-   output  [ID_WIDTH-1:0] o_b_id,
-   output  [USER_WIDTH-1:0] o_b_user,
+   output  wire [ID_WIDTH:0] o_b_id,
+   output  wire [USER_WIDTH:0] o_b_user,
     
     // AXI read channel
-    input   i_rready,
-    output  [31:0] o_rdata,
-    output  [1:0] o_rresp,
-    output  o_rlast,
-    output  o_rvalid,
+    input   wire i_rready,
+    output  wire [31:0] o_rdata,
+    output  wire [1:0] o_rresp,
+    output  wire o_rlast,
+    output  wire o_rvalid,
     //unused signals
-    output  [ID_WIDTH-1:0] o_r_id,
-    output  [USER_WIDTH-1:0] o_r_user,
+    output  wire [ID_WIDTH:0] o_r_id,
+    output  wire [USER_WIDTH:0] o_r_user,
     // ---------------------------------------------------------------- //
 
     // WB2AXI AXI SIGNALS FROM BRIDGE TO EXTERNAL(PERIPHERAL/ADAPTER/BUS)
 
 
     // AXI address write channel
-    input   i_awmready,
-    output  [AW_B-1:0] o_awmaddr,
-    output  o_awmvalid,
+    input   wire i_awmready,
+    output  wire [AW_B-1:0] o_awmaddr,
+    output  wire o_awmvalid,
     //unused signals
-    output  [ID_WIDTH-1:0] o_awm_id,
-    output  [7:0] o_awm_len,
-    output  [2:0] o_awm_size,
-    output  [1:0] o_awm_burst,
-    output  o_awm_lock,
-    output  [3:0] o_awm_cache,
-    output  [2:0] o_awm_prot,
-    output  [3:0] o_awm_qos,
-    output  [3:0] o_awm_region,
-    output  [5:0] o_awm_atop,
-    output  [USER_WIDTH-1:0] o_awm_user,
+    output  wire [ID_WIDTH:0] o_awm_id,
+    output  wire [7:0] o_awm_len,
+    output  wire [2:0] o_awm_size,
+    output  wire [1:0] o_awm_burst,
+    output  wire o_awm_lock,
+    output  wire [3:0] o_awm_cache,
+    output  wire [2:0] o_awm_prot,
+    output  wire [3:0] o_awm_qos,
+    output  wire [3:0] o_awm_region,
+    output  wire [5:0] o_awm_atop,
+    output  wire [USER_WIDTH-1:0] o_awm_user,
 
     // AXI address read channel
-    input   i_armready,
-    output  [AW_B-1:0] o_armaddr,
-    output  o_armvalid,
+    input   wire i_armready,
+    output  wire [AW_B-1:0] o_armaddr,
+    output  wire o_armvalid,
     //unused signals
-    output  [ID_WIDTH-1:0] o_arm_id,
-    output  [7:0] o_arm_len,
-    output  [2:0] o_arm_size,
-    output  [1:0] o_arm_burst,
-    output  o_arm_lock,
-    output  [3:0] o_arm_cache,
-    output  [2:0] o_arm_prot,
-    output  [3:0] o_arm_qos,
-    output  [3:0] o_arm_region,
-    output  [USER_WIDTH-1:0] o_arm_user,
+    output  wire [ID_WIDTH:0] o_arm_id,
+    output  wire [7:0] o_arm_len,
+    output  wire [2:0] o_arm_size,
+    output  wire [1:0] o_arm_burst,
+    output  wire o_arm_lock,
+    output  wire [3:0] o_arm_cache,
+    output  wire [2:0] o_arm_prot,
+    output  wire [3:0] o_arm_qos,
+    output  wire [3:0] o_arm_region,
+    output  wire [USER_WIDTH:0] o_arm_user,
 
     // AXI write channel
-    input  i_wmready,
-    output [31:0] o_wmdata,
-    output [3:0] o_wmstrb,
-    output o_wmvalid,
+    input  wire i_wmready,
+    output wire [31:0] o_wmdata,
+    output wire [3:0] o_wmstrb,
+    output wire o_wmvalid,
     //unused signals
-    output  o_wm_last,
-    output  [USER_WIDTH-1:0] o_wm_user,
+    output  wire o_wm_last,
+    output  wire [USER_WIDTH:0] o_wm_user,
 
     // AXI response channel
-    input  [1:0] i_bmresp,
-    input  i_bmvalid,
-    output o_bmready,
+    input  wire [1:0] i_bmresp,
+    input  wire i_bmvalid,
+    output wire o_bmready,
     //unused signals 
-    input  [ID_WIDTH-1:0] i_bm_id,
-    input  [USER_WIDTH-1:0] i_bm_user,
+    input  wire [ID_WIDTH:0] i_bm_id,
+    input  wire [USER_WIDTH:0] i_bm_user,
     
     //AXI read channel
-    input   [31:0] i_rmdata,
-    input   [1:0] i_rmresp,
-    input   i_rmlast,
-    input   i_rmvalid,
-    output  o_rmready,
+    input   wire [31:0] i_rmdata,
+    input   wire [1:0] i_rmresp,
+    input   wire i_rmlast,
+    input   wire i_rmvalid,
+    output  wire o_rmready,
     //unused signals
-    input wire [ID_WIDTH-1:0] i_rm_id,
-    input wire [USER_WIDTH-1:0] i_rm_user
+    input wire [ID_WIDTH:0] i_rm_id,
+    input wire [USER_WIDTH:0] i_rm_user
 
 );
 
