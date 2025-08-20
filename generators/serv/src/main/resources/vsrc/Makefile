@@ -2,9 +2,9 @@
 # Makefile to generate a preprocessed Verilog file for the SERV core
 #------------------------------------------------------------------------------
 
-BASE_DIR := $(abspath ../../../../../..)
-VSRC_DIR := $(abspath .)
-SERV_DIR := $(VSRC_DIR)/serv
+base_dir := $(abspath ../../../../../..)
+vscr_dir := $(abspath .)
+serv_dir := $(vsrc_dir)/serv
 
 # Output preprocessed Verilog
 PREPROC_VERILOG = ServCoreBlackbox.preprocessed.v
@@ -41,12 +41,12 @@ SERV_VSRCS = \
         $(SERV_DIR)/rtl/serv_rf_top.v
 
 # Top-level wrapper file (matches Chisel blackbox declaration)
-SERV_WRAPPER = $(VSRC_DIR)/ServCoreBlackbox.v
+SERV_WRAPPER = $(vscr_dir)/ServCoreBlackbox.v
 
 ALL_VSRCS = $(SERV_VSRCS) $(SERV_WRAPPER)
 
 # Chipyard includes helper script
-PREPROC_SCRIPT = $(BASE_DIR)/scripts/insert-includes.py
+PREPROC_SCRIPT = $(base_dir)/scripts/insert-includes.py
 
 # Include directories (empty unless you use third-party IP)
 lookup_dirs = $(shell find -L $(serv_dir) -name target -prune -o -type d -print 2> /dev/null | grep '.*/\($(1)\)$$')
